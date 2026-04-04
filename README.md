@@ -1,18 +1,14 @@
 # EBU6304_Group_65
-
 软件工程 · 助教招聘系统（Web 完整版，不含 AI 功能）
 
 ## 成员
 
-| QM ID | 姓名 |
-|------|------|
-| 231226668 | 周禹同 |
-| 231226716 | 吕瀚心 |
-| 231226794 | 张懿轩 |
-| 231226749 | 王宏博 |
-| 231226819 | 梁星宇 |
-| 231226543 | 王铁 |
-
+周禹同 qmid:231226668 gitId：KKush-TongBei
+Yixuan Zhang qmid:231226794 gitId：1678162910
+Hongbo Wang 231226749 gitId：Sh1Rana1
+hanxin lyu  231226716 gitId：jp2023213481
+Liang Xingyu 231226819 gitId：Liang1117
+Tie Wang 231226543 gitid:WANGNNNnnn
 ## 技术栈
 
 - **后端**：Python 3.9+、FastAPI、SQLAlchemy、SQLite（数据文件：`data/app.db`）、JWT、bcrypt  
@@ -76,4 +72,3 @@ AI 技能匹配、缺口分析等未实现，界面脚注中标注为后续迭�
 
 ## API 文档
 
-后端启动后访问：`http://127.0.0.1:8000/docs`（Swagger UI）。
