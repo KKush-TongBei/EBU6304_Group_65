@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -73,14 +73,15 @@ router_notifications = APIRouter(prefix="/api/notifications", tags=["notificatio
 def list_notifications(
     user: Annotated[User, Depends(require_roles(UserRole.ta))],
     db: Session = Depends(get_db),
+    unread_only: bool = Query(default=False),
 ):
     from app.models import Notification
 
-    rows = db.execute(
-        select(Notification)
-        .where(Notification.user_id == user.id)
-        .order_by(Notification.created_at.desc())
-    ).scalars().all()
+    stmt = select(Notification).where(Notification.user_id == user.id)
+    if unread_only:
+        stmt = stmt.where(Notification.read.is_(False))
+    stmt = stmt.order_by(Notification.created_at.desc())
+    rows = db.execute(stmt).scalars().all()
     return [NotificationOut.model_validate(n) for n in rows]
 
 

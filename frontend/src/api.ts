@@ -10,6 +10,13 @@ import type {
 
 const TOKEN_KEY = "ta_recruit_token";
 
+/** 生产构建时设为后端根地址，如 https://api.example.com；开发留空走 Vite 代理 */
+export function apiUrl(path: string): string {
+  const base = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ?? "";
+  if (path.startsWith("http")) return path;
+  return `${base}${path}`;
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -32,7 +39,7 @@ async function request<T>(
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     ...options,
     headers,
     body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
@@ -71,6 +78,10 @@ export const api = {
         method: "POST",
         json: body,
       }),
+    logout: () =>
+      request<{ ok: boolean }>("/api/auth/logout", {
+        method: "POST",
+      }),
     me: () => request<User>("/api/auth/me"),
   },
   jobs: {
@@ -96,7 +107,12 @@ export const api = {
     myApplications: () => request<Application[]>("/api/ta/applications"),
   },
   notifications: {
-    list: () => request<Notification[]>("/api/notifications"),
+    list: (params?: { unread_only?: boolean }) => {
+      const sp = new URLSearchParams();
+      if (params?.unread_only) sp.set("unread_only", "true");
+      const q = sp.toString();
+      return request<Notification[]>(`/api/notifications${q ? `?${q}` : ""}`);
+    },
     markRead: (ids?: number[]) =>
       request<{ ok: boolean }>("/api/notifications/mark-read", {
         method: "POST",
@@ -136,19 +152,25 @@ export const api = {
   },
 };
 
-export function downloadWithAuth(url: string, filename: string) {
+export async function downloadWithAuth(url: string, filename: string): Promise<void> {
   const token = getToken();
-  fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-    .then((r) => {
-      if (!r.ok) throw new Error("Download failed");
-      return r.blob();
-    })
-    .then((blob) => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    })
-    .catch(() => alert("导出失败"));
+  const res = await fetch(apiUrl(url), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    let detail = "下载失败";
+    try {
+      const j = await res.json();
+      if (j.detail) detail = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail);
+    } catch {
+      detail = res.statusText || detail;
+    }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
