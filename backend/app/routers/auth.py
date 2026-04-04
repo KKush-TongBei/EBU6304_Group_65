@@ -62,6 +62,12 @@ def login(body: LoginBody, db: Session = Depends(get_db)):
     return Token(access_token=create_access_token(str(user.id)))
 
 
+@router.post("/logout")
+def logout():
+    """客户端清除 Token 即可；此处用于对称 API 与可选审计扩展。"""
+    return {"ok": True}
+
+
 @router.get("/me", response_model=UserMe)
 def me(user: Annotated[User, Depends(get_current_user)]):
     return user

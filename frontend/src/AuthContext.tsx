@@ -20,7 +20,7 @@ interface AuthState {
     display_name?: string;
     student_id?: string;
   }) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -71,7 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return u;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      if (getToken()) await api.auth.logout();
+    } catch {
+      /* 忽略网络错误，仍清除本地会话 */
+    }
     setToken(null);
     setUser(null);
   };

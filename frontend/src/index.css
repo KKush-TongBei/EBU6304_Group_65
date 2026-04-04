@@ -3,5 +3,5 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-100 text-ink-900 antialiased min-h-screen;
+  @apply bg-slate-100 text-ink-900 antialiased min-h-screen dark:bg-slate-950 dark:text-slate-100;
 }
