@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { Button, Card, Input } from "../ui";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
   const { login, user } = useAuth();
@@ -10,6 +12,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   if (user) {
     if (user.role === "ta") nav("/ta", { replace: true });
@@ -20,9 +24,24 @@ export default function LoginPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr("");
+    if (!email.trim()) {
+      setErr("请输入邮箱");
+      emailRef.current?.focus();
+      return;
+    }
+    if (!EMAIL_RE.test(email.trim())) {
+      setErr("邮箱格式不正确");
+      emailRef.current?.focus();
+      return;
+    }
+    if (!password) {
+      setErr("请输入密码");
+      passwordRef.current?.focus();
+      return;
+    }
     setBusy(true);
     try {
-      const u = await login(email, password);
+      const u = await login(email.trim(), password);
       if (u.role === "ta") nav("/ta");
       else if (u.role === "mo") nav("/mo");
       else nav("/admin");
@@ -34,43 +53,58 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-100 via-white to-sky-50">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-100 via-white to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="font-display text-3xl font-bold text-ink-950 tracking-tight">
+          <h1 className="font-display text-3xl font-bold text-ink-950 dark:text-white tracking-tight">
             助教招聘系统
           </h1>
-          <p className="text-ink-500 mt-2 text-sm">Teaching Assistant Recruitment · BUPT International</p>
+          <p className="text-ink-500 dark:text-slate-400 mt-2 text-sm">
+            Teaching Assistant Recruitment · BUPT International
+          </p>
         </div>
         <Card className="p-8">
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} className="space-y-4" noValidate>
             <div>
-              <label className="block text-xs font-semibold text-ink-700 mb-1">邮箱</label>
+              <label htmlFor="login-email" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
+                邮箱
+              </label>
               <Input
+                id="login-email"
+                ref={emailRef}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 autoComplete="username"
                 placeholder="you@example.com"
+                aria-invalid={!!err && !email.trim()}
+                aria-describedby={err ? "login-err" : undefined}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-ink-700 mb-1">密码</label>
+              <label htmlFor="login-password" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
+                密码
+              </label>
               <Input
+                id="login-password"
+                ref={passwordRef}
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 autoComplete="current-password"
+                aria-invalid={!!err && !password}
               />
             </div>
-            {err && <p className="text-sm text-red-600">{err}</p>}
+            {err && (
+              <p id="login-err" className="text-sm text-red-600 dark:text-red-400" role="alert">
+                {err}
+              </p>
+            )}
             <Button type="submit" className="w-full" disabled={busy}>
               {busy ? "登录中…" : "登录"}
             </Button>
           </form>
-          <p className="text-center text-sm text-ink-500 mt-6">
+          <p className="text-center text-sm text-ink-500 dark:text-slate-400 mt-6">
             没有账号？{" "}
             <Link to="/register" className="text-accent font-semibold hover:underline">
               注册
