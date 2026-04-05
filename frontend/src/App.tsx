@@ -8,10 +8,13 @@ import RegisterPage from "./pages/RegisterPage";
 import RequireRole from "./pages/RequireRole";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminLogs from "./pages/admin/AdminLogs";
+import AdminSettings from "./pages/admin/AdminSettings";
+import AdminUsers from "./pages/admin/AdminUsers";
 import MOHome from "./pages/mo/MOHome";
 import MOJobDetail from "./pages/mo/MOJobDetail";
 import MOJobs from "./pages/mo/MOJobs";
 import MOPost from "./pages/mo/MOPost";
+import NotificationsPage from "./pages/NotificationsPage";
 import TAApplications from "./pages/ta/TAApplications";
 import TAHome from "./pages/ta/TAHome";
 import TAJobs from "./pages/ta/TAJobs";
@@ -60,6 +63,14 @@ export default function App() {
                   </RequireRole>
                 }
               />
+              <Route
+                path="/ta/notifications"
+                element={
+                  <RequireRole role="ta">
+                    <NotificationsPage role="ta" />
+                  </RequireRole>
+                }
+              />
 
               <Route
                 path="/mo"
@@ -93,6 +104,14 @@ export default function App() {
                   </RequireRole>
                 }
               />
+              <Route
+                path="/mo/notifications"
+                element={
+                  <RequireRole role="mo">
+                    <NotificationsPage role="mo" />
+                  </RequireRole>
+                }
+              />
 
               <Route
                 path="/admin"
@@ -107,6 +126,30 @@ export default function App() {
                 element={
                   <RequireRole role="admin">
                     <AdminLogs />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <RequireRole role="admin">
+                    <AdminUsers />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/admin/settings"
+                element={
+                  <RequireRole role="admin">
+                    <AdminSettings />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/admin/notifications"
+                element={
+                  <RequireRole role="admin">
+                    <NotificationsPage role="admin" />
                   </RequireRole>
                 }
               />

@@ -16,7 +16,6 @@ interface AuthState {
   register: (p: {
     email: string;
     password: string;
-    role: "ta" | "mo" | "admin";
     display_name?: string;
     student_id?: string;
   }) => Promise<User>;
@@ -60,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (p: {
     email: string;
     password: string;
-    role: "ta" | "mo" | "admin";
     display_name?: string;
     student_id?: string;
   }) => {
