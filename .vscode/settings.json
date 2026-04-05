@@ -1,0 +1,12 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.maven.enabled": true,
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-17",
+      "path": "${workspaceFolder}/.tools/jdk-17.0.13+11/Contents/Home",
+      "default": true
+    }
+  ],
+  "java.jdt.ls.java.home": "${workspaceFolder}/.tools/jdk-17.0.13+11/Contents/Home"
+}
