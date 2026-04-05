@@ -24,6 +24,20 @@ Tie Wang 231226543 gitid:WANGNNNnnn
 
 ## 本地运行（合规主版本：`java-web`）
 
+### 0. 一键环境（推荐）
+
+若已按上文在仓库 `.tools/` 下放置 **JDK 17、Maven 3.9.x、Tomcat 10.1.x**（或通过 `CATALINA_HOME` / `JAVA_HOME` 使用本机安装），可在仓库根目录执行：
+
+```bash
+./scripts/tomcat-run.sh          # mvn package + 部署 WAR + 前台启动 Tomcat（Ctrl+C 停止）
+./scripts/tomcat-stop.sh         # 停止 Tomcat（若以后台方式启动过）
+./scripts/build-war.sh           # 仅构建 WAR（可附加 Maven 参数，如 -DskipTests）
+```
+
+脚本会设置 **`TA_DATA_DIR`** 为 **`java-web/data`**（可写、不依赖 Tomcat 工作目录），并设置本地开发用 **`TA_JWT_SECRET`**（生产请覆盖）。
+
+**Cursor / VS Code**：打开仓库根目录后，可安装工作区推荐的 **Extension Pack for Java**；`.vscode/settings.json` 已指向 `.tools` 下的 JDK 17（若路径不存在请在设置里改成本机 JDK）。
+
 ### 1. 构建 WAR
 
 ```bash
@@ -61,7 +75,7 @@ cp -r dist/* ../java-web/src/main/webapp/
 
 ### 4. 健康检查
 
-浏览器或 curl 访问：`http://<主机>:<端口>/<上下文路径>/api/health`，应返回 `{"status":"ok"}`。
+浏览器或 curl 访问：`http://<主机>:<端口>/<上下文路径>/api/health`，应返回 JSON，至少含 `status: ok`，并含 `version`、`time`、`java`、`data_dir` 等字段（便于确认运行版本与数据目录）。
 
 ### 5. 与教师确认（页面技术）
 
