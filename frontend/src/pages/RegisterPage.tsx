@@ -1,17 +1,22 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
-import type { UserRole } from "../types";
-import { Button, Card, Input, Select } from "../ui";
+import { Button, Card, Input } from "../ui";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function strongPassword(p: string): string | null {
+  if (p.length < 8) return "密码至少 8 位";
+  if (!/[A-Za-z]/.test(p)) return "密码需包含至少一个字母";
+  if (!/\d/.test(p)) return "密码需包含至少一个数字";
+  return null;
+}
 
 export default function RegisterPage() {
   const { register, user } = useAuth();
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("ta");
   const [displayName, setDisplayName] = useState("");
   const [studentId, setStudentId] = useState("");
   const [err, setErr] = useState("");
@@ -29,7 +34,7 @@ export default function RegisterPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr("");
-    if (role === "ta" && !studentId.trim()) {
+    if (!studentId.trim()) {
       setErr("助教账号需要填写学号");
       studentRef.current?.focus();
       return;
@@ -39,23 +44,21 @@ export default function RegisterPage() {
       emailRef.current?.focus();
       return;
     }
-    if (password.length < 6) {
-      setErr("密码至少 6 位");
+    const pwErr = strongPassword(password);
+    if (pwErr) {
+      setErr(pwErr);
       passwordRef.current?.focus();
       return;
     }
     setBusy(true);
     try {
-      const u = await register({
+      await register({
         email: email.trim(),
         password,
-        role,
         display_name: displayName || undefined,
-        student_id: role === "ta" ? studentId : undefined,
+        student_id: studentId.trim(),
       });
-      if (u.role === "ta") nav("/ta");
-      else if (u.role === "mo") nav("/mo");
-      else nav("/admin");
+      nav("/ta");
     } catch (e2: unknown) {
       setErr(e2 instanceof Error ? e2.message : "注册失败");
     } finally {
@@ -68,44 +71,29 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="font-display text-3xl font-bold text-ink-950 dark:text-white">创建账号</h1>
-          <p className="text-ink-500 dark:text-slate-400 mt-2 text-sm">选择角色以进入对应工作台</p>
+          <p className="text-ink-500 dark:text-slate-400 mt-2 text-sm">
+            公开注册仅限 <strong>助教 (TA)</strong>。MO / Admin 由管理员在后台创建。
+          </p>
         </div>
         <Card className="p-8">
           <form onSubmit={submit} className="space-y-4" noValidate>
-            <div>
-              <label htmlFor="reg-role" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
-                角色
-              </label>
-              <Select
-                id="reg-role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                aria-label="选择账号角色"
-              >
-                <option value="ta">助教 (TA)</option>
-                <option value="mo">课程负责人 (MO)</option>
-                <option value="admin">管理员 (Admin)</option>
-              </Select>
-            </div>
             <div>
               <label htmlFor="reg-name" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
                 显示名称
               </label>
               <Input id="reg-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             </div>
-            {role === "ta" && (
-              <div>
-                <label htmlFor="reg-student" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
-                  学号
-                </label>
-                <Input
-                  id="reg-student"
-                  ref={studentRef}
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                />
-              </div>
-            )}
+            <div>
+              <label htmlFor="reg-student" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
+                学号
+              </label>
+              <Input
+                id="reg-student"
+                ref={studentRef}
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+              />
+            </div>
             <div>
               <label htmlFor="reg-email" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
                 邮箱
@@ -120,7 +108,7 @@ export default function RegisterPage() {
             </div>
             <div>
               <label htmlFor="reg-password" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
-                密码（至少 6 位）
+                密码（≥8 位，含字母与数字）
               </label>
               <Input
                 id="reg-password"
@@ -128,7 +116,7 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
+                autoComplete="new-password"
               />
             </div>
             {err && (
@@ -137,7 +125,7 @@ export default function RegisterPage() {
               </p>
             )}
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "提交中…" : "注册"}
+              {busy ? "提交中…" : "注册为 TA"}
             </Button>
           </form>
           <p className="text-center text-sm text-ink-500 dark:text-slate-400 mt-6">
