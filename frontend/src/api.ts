@@ -200,6 +200,7 @@ export const api = {
         json: { status },
       }),
     exportCsvUrl: (jobId: number) => `/api/mo/jobs/${jobId}/export.csv`,
+    applicantCvDownloadUrl: (applicationId: number) => `/api/mo/applications/${applicationId}/cv`,
   },
   admin: {
     dashboard: () => request<Record<string, unknown>>("/api/admin/dashboard"),

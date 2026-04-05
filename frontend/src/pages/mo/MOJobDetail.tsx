@@ -4,7 +4,18 @@ import { api, downloadWithAuth } from "../../api";
 import { useFeedback } from "../../feedback";
 import type { Application, Job, JobStatus } from "../../types";
 import AppShell from "../../AppShell";
-import { Button, Card, Input, Select, Textarea, StatusBadge } from "../../ui";
+import {
+  Button,
+  Card,
+  IconCheck,
+  IconEye,
+  IconX,
+  Input,
+  Select,
+  StatCard,
+  Textarea,
+  StatusBadge,
+} from "../../ui";
 
 type JobForm = {
   module_name: string;
@@ -338,6 +349,34 @@ export default function MOJobDetail() {
   const nextStates = job ? allowedTransitions(job.status as JobStatus) : [];
   const canClose = job && job.status !== "closed" && job.status !== "cancelled";
 
+  const appStats = useMemo(() => {
+    const total = apps.length;
+    const pending = apps.filter((a) => a.status === "pending").length;
+    const accepted = apps.filter((a) => a.status === "accepted").length;
+    const rejected = apps.filter((a) => a.status === "rejected").length;
+    return { total, pending, accepted, rejected };
+  }, [apps]);
+
+  const downloadApplicantCv = async (a: Application) => {
+    if (!a.ta_cv_file_id) {
+      toast("该申请人尚未上传简历", "info");
+      return;
+    }
+    const name = a.ta_cv_original_name?.trim() || `application_${a.id}_cv`;
+    try {
+      await downloadWithAuth(api.mo.applicantCvDownloadUrl(a.id), name);
+      toast("已开始下载", "success");
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "下载失败", "error");
+    }
+  };
+
+  const jobTypeLabel = (t: string | undefined) => {
+    if (t === "invigilation") return "监考";
+    if (t === "event_support") return "活动支持";
+    return "课程 TA";
+  };
+
   if (!jobId || Number.isNaN(jobId)) {
     return (
       <AppShell title="岗位" role="mo">
@@ -389,6 +428,20 @@ export default function MOJobDetail() {
         <Link to="/mo/jobs" className="text-sm text-accent hover:underline">
           ← 返回岗位列表
         </Link>
+      </div>
+
+      <header className="mb-6">
+        <h1 className="font-display text-2xl md:text-3xl font-bold text-ink-950 dark:text-white tracking-tight">
+          {job.module_name}
+        </h1>
+        <p className="text-sm text-ink-500 dark:text-slate-400 mt-1">查看与处理本岗位的助教申请</p>
+      </header>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatCard title="申请总数" value={appStats.total} tone="neutral" />
+        <StatCard title="待处理" value={appStats.pending} tone="warn" />
+        <StatCard title="已录用" value={appStats.accepted} tone="ok" />
+        <StatCard title="已拒绝" value={appStats.rejected} tone="bad" />
       </div>
 
       <Card className="p-4 mb-4 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/50">
@@ -557,51 +610,55 @@ export default function MOJobDetail() {
         )}
       </Card>
 
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
-        <h2 className="font-display font-semibold text-lg text-ink-950 dark:text-white">申请人</h2>
-        <div className="flex flex-wrap gap-2 items-end">
-          <div>
-            <label htmlFor="app-sort" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-              排序
-            </label>
-            <Select
-              id="app-sort"
-              className="mt-1"
-              value={appSort}
-              onChange={(e) => setAppSort(e.target.value)}
-              aria-label="申请人排序"
-            >
-              <option value="">申请时间</option>
-              <option value="total_score">总分</option>
-              <option value="skill_match">技能匹配</option>
-            </Select>
+      <h2 className="font-display font-semibold text-lg text-ink-950 dark:text-white mb-3">申请人</h2>
+      <Card className="p-4 mb-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div>
+              <label htmlFor="app-sort" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block mb-1">
+                排序
+              </label>
+              <Select
+                id="app-sort"
+                className="min-w-[140px]"
+                value={appSort}
+                onChange={(e) => setAppSort(e.target.value)}
+                aria-label="申请人排序"
+              >
+                <option value="">申请时间</option>
+                <option value="total_score">总分</option>
+                <option value="skill_match">技能匹配</option>
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="app-filter" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block mb-1">
+                申请状态
+              </label>
+              <Select
+                id="app-filter"
+                className="min-w-[140px]"
+                value={appStatusFilter}
+                onChange={(e) => setAppStatusFilter(e.target.value)}
+                aria-label="按申请状态筛选"
+              >
+                <option value="">全部</option>
+                <option value="pending">待处理</option>
+                <option value="accepted">已录用</option>
+                <option value="rejected">已拒绝</option>
+                <option value="withdrawn">已撤回</option>
+              </Select>
+            </div>
           </div>
-          <div>
-            <label htmlFor="app-filter" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-              申请状态
-            </label>
-            <Select
-              id="app-filter"
-              className="mt-1"
-              value={appStatusFilter}
-              onChange={(e) => setAppStatusFilter(e.target.value)}
-              aria-label="按申请状态筛选"
-            >
-              <option value="">全部</option>
-              <option value="pending">待处理</option>
-              <option value="accepted">已录用</option>
-              <option value="rejected">已拒绝</option>
-              <option value="withdrawn">已撤回</option>
-            </Select>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outlineDanger" className="!py-2" onClick={() => batchDecide("rejected")}>
+              批量拒绝所选
+            </Button>
+            <Button type="button" variant="outlineSuccess" className="!py-2" onClick={() => batchDecide("accepted")}>
+              批量录用所选
+            </Button>
           </div>
-          <Button type="button" variant="secondary" className="!py-2" onClick={() => batchDecide("rejected")}>
-            批量拒绝所选
-          </Button>
-          <Button type="button" className="!py-2" onClick={() => batchDecide("accepted")}>
-            批量录用所选
-          </Button>
         </div>
-      </div>
+      </Card>
 
       {apps.length === 0 ? (
         <Card className="p-8 text-center text-ink-500 dark:text-slate-400">暂无申请</Card>
@@ -614,13 +671,13 @@ export default function MOJobDetail() {
                   <span className="sr-only">选择</span>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left">
-                  姓名
+                  申请人
+                </th>
+                <th scope="col" className="px-4 py-3 text-left">
+                  岗位
                 </th>
                 <th scope="col" className="px-4 py-3 text-left">
                   邮箱
-                </th>
-                <th scope="col" className="px-4 py-3 text-left">
-                  学号
                 </th>
                 <th scope="col" className="px-4 py-3 text-left">
                   状态
@@ -628,7 +685,7 @@ export default function MOJobDetail() {
                 <th scope="col" className="px-4 py-3 text-left">
                   总分
                 </th>
-                <th scope="col" className="px-4 py-3 text-left">
+                <th scope="col" className="px-4 py-3 text-left min-w-[220px]">
                   操作
                 </th>
               </tr>
@@ -653,43 +710,76 @@ export default function MOJobDetail() {
                         <span className="text-ink-300">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-ink-950 dark:text-white">{a.ta_display_name}</td>
-                    <td className="px-4 py-3 text-ink-600 dark:text-slate-300">{a.ta_email}</td>
-                    <td className="px-4 py-3 text-ink-600 dark:text-slate-300">{a.ta_student_id}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-ink-950 dark:text-white">{a.ta_display_name ?? "—"}</div>
+                      <div className="text-xs text-ink-500 dark:text-slate-400 mt-0.5">
+                        申请 #{a.id} · 用户 {a.ta_user_id}
+                        {a.ta_student_id ? ` · ${a.ta_student_id}` : ""}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-ink-900 dark:text-slate-100">{job.module_name}</div>
+                      <div className="text-xs text-ink-500 dark:text-slate-400 mt-0.5">
+                        {(a.job?.term || job.term || "—") + " · " + jobTypeLabel(a.job?.job_type ?? job.job_type)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-ink-600 dark:text-slate-300 text-sm">{a.ta_email}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={a.status} />
                     </td>
-                    <td className="px-4 py-3 text-ink-700 dark:text-slate-200">
+                    <td className="px-4 py-3 text-ink-700 dark:text-slate-200 tabular-nums">
                       {a.evaluation_total != null ? a.evaluation_total : "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-2 flex-wrap">
-                        <Button type="button" variant="secondary" className="!py-1 !px-2 text-xs" onClick={() => openEval(a)}>
+                      <div className="flex gap-1.5 flex-wrap items-center">
+                        <Button
+                          type="button"
+                          variant="outlineInfo"
+                          className="!py-1.5 !px-2.5 text-xs"
+                          onClick={() => downloadApplicantCv(a)}
+                          disabled={!a.ta_cv_file_id}
+                          title={a.ta_cv_file_id ? "下载简历" : "无简历文件"}
+                          aria-label="查看简历"
+                        >
+                          <IconEye />
+                          简历
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outlineMuted"
+                          className="!py-1.5 !px-2.5 text-xs"
+                          onClick={() => openEval(a)}
+                        >
                           {expandedEval === a.id ? "收起评分" : "评分"}
                         </Button>
                         {a.status === "pending" ? (
                           <>
-                            <Button type="button" className="!py-1 !px-2 text-xs" onClick={() => decide(a.id, "accepted")}>
+                            <Button
+                              type="button"
+                              variant="outlineSuccess"
+                              className="!py-1.5 !px-2.5 text-xs"
+                              onClick={() => decide(a.id, "accepted")}
+                            >
+                              <IconCheck />
                               录用
                             </Button>
                             <Button
                               type="button"
-                              variant="danger"
-                              className="!py-1 !px-2 text-xs"
+                              variant="outlineDanger"
+                              className="!py-1.5 !px-2.5 text-xs"
                               onClick={() => decide(a.id, "rejected")}
                             >
+                              <IconX />
                               拒绝
                             </Button>
                           </>
-                        ) : (
-                          <span className="text-ink-400 dark:text-slate-500">—</span>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>
                   {expandedEval === a.id && evalDraft ? (
                     <tr className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
-                      <td colSpan={7} className="px-4 py-4">
+                      <td colSpan={8} className="px-4 py-4">
                         <div className="grid sm:grid-cols-5 gap-2 max-w-4xl">
                           {(
                             [

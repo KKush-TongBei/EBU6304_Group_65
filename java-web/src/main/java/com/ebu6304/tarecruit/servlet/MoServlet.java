@@ -22,6 +22,7 @@ public final class MoServlet extends JsonServlet {
   private static final Pattern JOB_CSV = Pattern.compile("^/jobs/(\\d+)/export\\.csv$");
   private static final Pattern APP_DECIDE = Pattern.compile("^/applications/(\\d+)$");
   private static final Pattern APP_EVAL = Pattern.compile("^/applications/(\\d+)/evaluation$");
+  private static final Pattern APP_CV = Pattern.compile("^/applications/(\\d+)/cv$");
 
   @Override
   protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -73,6 +74,15 @@ public final class MoServlet extends JsonServlet {
         resp.setContentType("text/csv; charset=UTF-8");
         resp.setHeader("Content-Disposition", "attachment; filename=\"job_" + jobId + "_applicants.csv\"");
         resp.getOutputStream().write(csv.getBytes(StandardCharsets.UTF_8));
+        return;
+      }
+      Matcher mcv = APP_CV.matcher(pi);
+      if (mcv.matches()) {
+        int appId = Integer.parseInt(mcv.group(1));
+        byte[] bytes = s.moDownloadApplicantCv(uid, appId);
+        resp.setStatus(200);
+        resp.setContentType("application/octet-stream");
+        resp.getOutputStream().write(bytes);
         return;
       }
       resp.sendError(HttpServletResponse.SC_NOT_FOUND);
