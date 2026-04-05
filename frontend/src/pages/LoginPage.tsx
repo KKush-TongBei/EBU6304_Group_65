@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { Button, Card, Input } from "../ui";
 
@@ -8,10 +8,20 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function LoginPage() {
   const { login, user } = useAuth();
   const nav = useNavigate();
+  const [params] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sessionHint, setSessionHint] = useState("");
+
+  useEffect(() => {
+    const reason = params.get("reason");
+    if (reason === "session" || sessionStorage.getItem("ta_session_expired")) {
+      setSessionHint("登录已过期，请重新登录。");
+      sessionStorage.removeItem("ta_session_expired");
+    }
+  }, [params]);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +74,11 @@ export default function LoginPage() {
           </p>
         </div>
         <Card className="p-8">
+          {sessionHint ? (
+            <p className="mb-4 text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+              {sessionHint}
+            </p>
+          ) : null}
           <form onSubmit={submit} className="space-y-4" noValidate>
             <div>
               <label htmlFor="login-email" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
