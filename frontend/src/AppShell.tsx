@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
+import { api } from "./api";
 import { useAuth } from "./AuthContext";
 import type { UserRole } from "./types";
 import { useTheme } from "./theme";
@@ -20,11 +21,22 @@ export default function AppShell({
   const { theme, toggle } = useTheme();
   const nav = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadN, setUnreadN] = useState(0);
 
-  const tabs =
+  useEffect(() => {
+    if (!user) return;
+    api.notifications
+      .summary()
+      .then((s) => setUnreadN(s.unread_count))
+      .catch(() => setUnreadN(0));
+  }, [user]);
+
+  type Tab = { to: string; label: string; badge?: number };
+  const tabs: Tab[] =
     role === "ta"
       ? [
           { to: "/ta", label: "总览" },
+          { to: "/ta/notifications", label: "通知", badge: unreadN },
           { to: "/ta/profile", label: "个人资料" },
           { to: "/ta/jobs", label: "浏览岗位" },
           { to: "/ta/applications", label: "我的申请" },
@@ -32,11 +44,15 @@ export default function AppShell({
       : role === "mo"
         ? [
             { to: "/mo", label: "总览" },
+            { to: "/mo/notifications", label: "通知", badge: unreadN },
             { to: "/mo/jobs", label: "我的岗位" },
             { to: "/mo/post", label: "发布岗位" },
           ]
         : [
-            { to: "/admin", label: "工作量" },
+            { to: "/admin", label: "总览" },
+            { to: "/admin/notifications", label: "通知", badge: unreadN },
+            { to: "/admin/users", label: "创建用户" },
+            { to: "/admin/settings", label: "系统设置" },
             { to: "/admin/logs", label: "活动日志" },
           ];
 
@@ -87,7 +103,14 @@ export default function AppShell({
                 end={t.to === "/ta" || t.to === "/mo" || t.to === "/admin"}
                 className={navClass}
               >
-                {t.label}
+                <span className="inline-flex items-center gap-1.5">
+                  {t.label}
+                  {t.badge != null && t.badge > 0 ? (
+                    <span className="min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+                      {t.badge > 99 ? "99+" : t.badge}
+                    </span>
+                  ) : null}
+                </span>
               </NavLink>
             ))}
           </nav>
@@ -140,7 +163,14 @@ export default function AppShell({
                 className={navClass}
                 onClick={() => setMenuOpen(false)}
               >
-                {t.label}
+                <span className="inline-flex items-center gap-1.5">
+                  {t.label}
+                  {t.badge != null && t.badge > 0 ? (
+                    <span className="min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+                      {t.badge > 99 ? "99+" : t.badge}
+                    </span>
+                  ) : null}
+                </span>
               </NavLink>
             ))}
           </nav>
@@ -154,7 +184,7 @@ export default function AppShell({
         {children}
       </main>
       <footer className="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-ink-500 dark:text-slate-500">
-        EBU6304 Group 65 · 非 AI 功能完整版 · 智能匹配功能即将推出
+        EBU6304 Group 65 · TA 招聘系统（Servlet + JSON 文件存储）
       </footer>
     </div>
   );

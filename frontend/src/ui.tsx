@@ -92,7 +92,13 @@ export function StatusBadge({ status }: { status: string }) {
   if (s === "rejected") return <Badge tone="bad">已拒绝</Badge>;
   if (s === "withdrawn") return <Badge tone="neutral">已撤回</Badge>;
   if (s === "open") return <Badge tone="ok">开放</Badge>;
+  if (s === "draft") return <Badge tone="neutral">草稿</Badge>;
+  if (s === "screening") return <Badge tone="warn">筛选中</Badge>;
+  if (s === "interview") return <Badge tone="warn">候选中</Badge>;
+  if (s === "shortlist") return <Badge tone="warn">短名单</Badge>;
+  if (s === "filled") return <Badge tone="ok">已招满</Badge>;
   if (s === "closed") return <Badge tone="neutral">已关闭</Badge>;
+  if (s === "cancelled") return <Badge tone="bad">已取消</Badge>;
   return <Badge>{status}</Badge>;
 }
 
