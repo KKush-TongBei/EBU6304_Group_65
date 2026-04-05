@@ -18,6 +18,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -82,6 +84,16 @@ class TaRecruitServiceCoreTest {
 
     AtomicJsonFile.writeAtomic(dataDir.resolve("users.json"), users);
     AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+  }
+
+  @Test
+  void healthIncludesStatusVersionAndDataDir() {
+    Map<String, String> h = svc.health();
+    assertEquals("ok", h.get("status"));
+    assertEquals("1.0.0", h.get("version"));
+    assertTrue(h.containsKey("time"));
+    assertTrue(h.containsKey("java"));
+    assertEquals(dataDir.toAbsolutePath().normalize().toString(), h.get("data_dir"));
   }
 
   @Test

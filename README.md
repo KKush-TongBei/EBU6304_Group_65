@@ -75,7 +75,7 @@ cp -r dist/* ../java-web/src/main/webapp/
 
 ### 4. 健康检查
 
-浏览器或 curl 访问：`http://<主机>:<端口>/<上下文路径>/api/health`，应返回 `{"status":"ok"}`。
+浏览器或 curl 访问：`http://<主机>:<端口>/<上下文路径>/api/health`，应返回 JSON，至少含 `status: ok`，并含 `version`、`time`、`java`、`data_dir` 等字段（便于确认运行版本与数据目录）。
 
 ### 5. 与教师确认（页面技术）
 
