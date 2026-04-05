@@ -161,8 +161,15 @@ public final class TaRecruitService {
     }
   }
 
+  /** Health check JSON; {@code version} should match {@code pom.xml} artifact version. */
   public Map<String, String> health() {
-    return Map.of("status", "ok");
+    Map<String, String> m = new LinkedHashMap<>();
+    m.put("status", "ok");
+    m.put("version", "1.0.0");
+    m.put("time", Instant.now().toString());
+    m.put("java", System.getProperty("java.version", "unknown"));
+    m.put("data_dir", usersPath.getParent().toString());
+    return m;
   }
 
   public Map<String, Object> register(Map<String, Object> body) {
