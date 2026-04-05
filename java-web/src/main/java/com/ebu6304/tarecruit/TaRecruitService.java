@@ -471,7 +471,7 @@ public final class TaRecruitService {
       logActivityUnsafe(logs, c, user.id, "application_submitted", "application", result.id,
           Map.of("job_id", jobId));
       saveAll(users, jobs, apps, null, null, logs, c);
-      return applicationOut(apps, jobs, users, result, readEvaluationsUnsafe());
+      return applicationOut(apps, jobs, users, result, readEvaluationsUnsafe(), null);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -549,7 +549,7 @@ public final class TaRecruitService {
       return apps.stream()
           .filter(a -> a.ta_user_id == userId)
           .sorted(Comparator.comparing((ApplicationRecord a) -> a.created_at).reversed())
-          .map(a -> applicationOut(apps, jobs, users, a, evals))
+          .map(a -> applicationOut(apps, jobs, users, a, evals, null))
           .collect(Collectors.toList());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -632,7 +632,7 @@ public final class TaRecruitService {
       logActivityUnsafe(logs, c, userId, "application_withdrawn", "application", a.id,
           Map.of("job_id", a.job_id));
       saveAll(users, jobs, apps, null, null, logs, c);
-      return applicationOut(apps, jobs, users, a, readEvaluationsUnsafe());
+      return applicationOut(apps, jobs, users, a, readEvaluationsUnsafe(), null);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -911,6 +911,7 @@ public final class TaRecruitService {
       List<ApplicationRecord> apps = readApplicationsUnsafe();
       List<UserRecord> users = readUsersUnsafe();
       List<ApplicationEvaluationRecord> evals = readEvaluationsUnsafe();
+      List<CvFileRecord> cvFiles = readCvFilesUnsafe();
       final String st = statusFilter != null ? statusFilter.strip() : "";
       Comparator<ApplicationRecord> cmp = Comparator.comparing((ApplicationRecord a) -> a.created_at).reversed();
       if ("total_score".equalsIgnoreCase(sortBy)) {
@@ -924,7 +925,7 @@ public final class TaRecruitService {
           .filter(a -> a.job_id == jobId)
           .filter(a -> st.isEmpty() || st.equalsIgnoreCase(a.status))
           .sorted(cmp)
-          .map(a -> applicationOut(apps, jobs, users, a, evals))
+          .map(a -> applicationOut(apps, jobs, users, a, evals, cvFiles))
           .collect(Collectors.toList());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -1018,7 +1019,7 @@ public final class TaRecruitService {
       logActivityUnsafe(logs, c, mo.id, "application_" + status, "application", appRow.id, decisionLog);
       saveAll(users, jobs, apps, notifs, assigns, logs, c);
       Map<String, Object> res = new LinkedHashMap<>(
-          applicationOut(apps, jobs, users, appRow, readEvaluationsUnsafe()));
+          applicationOut(apps, jobs, users, appRow, readEvaluationsUnsafe(), readCvFilesUnsafe()));
       res.put("warnings", warnings);
       return res;
     } catch (IOException e) {
@@ -1511,6 +1512,22 @@ public final class TaRecruitService {
     }
   }
 
+  private byte[] readCvFileBytes(CvFileRecord f) throws IOException {
+    if (f.stored_name != null && f.stored_name.startsWith("cv_payloads/")) {
+      Path p = cvPayloadsDir.resolve(f.stored_name.substring("cv_payloads/".length()));
+      if (!Files.exists(p)) {
+        throw new ApiException(404, "File not found");
+      }
+      String b64 = Files.readString(p, StandardCharsets.UTF_8).trim();
+      return Base64.getDecoder().decode(b64);
+    }
+    Path legacy = uploadsDir.resolve(f.stored_name);
+    if (!Files.exists(legacy)) {
+      throw new ApiException(404, "File not found");
+    }
+    return Files.readAllBytes(legacy);
+  }
+
   public byte[] taDownloadCv(int userId, int fileId) {
     rw.readLock().lock();
     try {
@@ -1518,19 +1535,28 @@ public final class TaRecruitService {
       List<CvFileRecord> files = readCvFilesUnsafe();
       CvFileRecord f = files.stream().filter(x -> x.id == fileId && x.user_id == userId).findFirst()
           .orElseThrow(() -> new ApiException(404, "File not found"));
-      if (f.stored_name != null && f.stored_name.startsWith("cv_payloads/")) {
-        Path p = cvPayloadsDir.resolve(f.stored_name.substring("cv_payloads/".length()));
-        if (!Files.exists(p)) {
-          throw new ApiException(404, "File not found");
-        }
-        String b64 = Files.readString(p, StandardCharsets.UTF_8).trim();
-        return Base64.getDecoder().decode(b64);
+      return readCvFileBytes(f);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.readLock().unlock();
+    }
+  }
+
+  public byte[] moDownloadApplicantCv(int moUserId, int applicationId) {
+    rw.readLock().lock();
+    try {
+      UserRecord mo = requireRole(requireUserUnsafe(readUsersUnsafe(), moUserId), "mo");
+      List<JobRecord> jobs = readJobsUnsafe();
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      ApplicationRecord app = apps.stream().filter(a -> a.id == applicationId).findFirst().orElseThrow(
+          () -> new ApiException(404, "Application not found"));
+      ensureOwnJob(jobs, app.job_id, mo.id);
+      CvFileRecord f = latestCvForApplicant(readCvFilesUnsafe(), app.ta_user_id);
+      if (f == null) {
+        throw new ApiException(404, "No CV on file for this applicant");
       }
-      Path legacy = uploadsDir.resolve(f.stored_name);
-      if (!Files.exists(legacy)) {
-        throw new ApiException(404, "File not found");
-      }
-      return Files.readAllBytes(legacy);
+      return readCvFileBytes(f);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -1631,9 +1657,19 @@ public final class TaRecruitService {
     return m;
   }
 
+  private static CvFileRecord latestCvForApplicant(List<CvFileRecord> files, int taUserId) {
+    if (files == null || files.isEmpty()) {
+      return null;
+    }
+    return files.stream()
+        .filter(f -> f.user_id == taUserId)
+        .max(Comparator.comparing(f -> f.created_at != null ? f.created_at : Instant.EPOCH))
+        .orElse(null);
+  }
+
   private static Map<String, Object> applicationOut(
       List<ApplicationRecord> allApps, List<JobRecord> jobs, List<UserRecord> users, ApplicationRecord a,
-      List<ApplicationEvaluationRecord> evals) {
+      List<ApplicationEvaluationRecord> evals, List<CvFileRecord> cvFiles) {
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("id", a.id);
     m.put("job_id", a.job_id);
@@ -1648,6 +1684,11 @@ public final class TaRecruitService {
     m.put("ta_display_name", ta != null ? ta.display_name : null);
     m.put("ta_email", ta != null ? ta.email : null);
     m.put("ta_student_id", ta != null ? ta.student_id : null);
+    CvFileRecord cv = latestCvForApplicant(cvFiles, a.ta_user_id);
+    if (cv != null) {
+      m.put("ta_cv_file_id", cv.id);
+      m.put("ta_cv_original_name", cv.original_name != null ? cv.original_name : "");
+    }
     ApplicationEvaluationRecord ev = findEvaluation(evals, a.id);
     m.put("evaluation", evaluationToMap(ev));
     m.put("evaluation_total", ev != null ? scoreSum(ev) : 0);

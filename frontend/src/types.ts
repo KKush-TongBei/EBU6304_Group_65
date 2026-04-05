@@ -86,6 +86,8 @@ export interface Application {
   evaluation_total?: number;
   shortlist_tag?: string;
   warnings?: string[];
+  ta_cv_file_id?: number;
+  ta_cv_original_name?: string;
 }
 
 export interface Notification {
