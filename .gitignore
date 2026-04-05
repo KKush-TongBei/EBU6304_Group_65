@@ -1,3 +1,6 @@
+# Local toolchain (Node/JDK/Maven) downloaded for this workspace; do not commit
+.tools/
+
 *.pyc
 data/*.db
 data/*.db-journal
