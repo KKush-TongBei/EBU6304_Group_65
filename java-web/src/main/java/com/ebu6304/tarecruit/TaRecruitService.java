@@ -345,13 +345,25 @@ public final class TaRecruitService {
               return false;
             }
             if ("open".equals(eff)) {
-              return isTaRecruitingSlot(j, apps);
+              boolean slot = isTaRecruitingSlot(j, apps);
+              if ("ta".equals(user.role)) {
+                return slot && !taDeadlineClosed(j);
+              }
+              return slot;
             }
             if ("closed".equals(eff)) {
-              return "closed".equals(j.status) || "cancelled".equals(j.status) || "filled".equals(j.status);
+              boolean base = "closed".equals(j.status) || "cancelled".equals(j.status) || "filled".equals(j.status);
+              if ("ta".equals(user.role)) {
+                return base || taDeadlineClosed(j);
+              }
+              return base;
             }
             if ("recruiting".equals(eff)) {
-              return RECRUITING.contains(j.status) && acceptedCount(apps, j.id) < j.quota;
+              boolean rec = RECRUITING.contains(j.status) && acceptedCount(apps, j.id) < j.quota;
+              if ("ta".equals(user.role)) {
+                return rec && !taDeadlineClosed(j);
+              }
+              return rec;
             }
             return true;
           })
@@ -372,7 +384,7 @@ public final class TaRecruitService {
             return tags.contains(sk) || rq.contains(sk);
           })
           .sorted(jobComparator(sortParam))
-          .map(j -> jobOut(j, favIds.contains(j.id), apps))
+          .map(j -> jobOut(j, favIds.contains(j.id), apps, "ta".equals(user.role)))
           .collect(Collectors.toList());
       if (Boolean.TRUE.equals(unappliedOnly) && "ta".equals(user.role)) {
         out = out.stream()
@@ -428,7 +440,7 @@ public final class TaRecruitService {
           .findFirst().orElse(null);
       ApplicationRecord result;
       if (existing != null && !"withdrawn".equals(existing.status)) {
-        if ("pending".equals(existing.status)) {
+        if ("pending".equals(existing.status) || "interviewing".equals(existing.status)) {
           throw new ApiException(400, "Already applied");
         }
         if ("accepted".equals(existing.status) || "rejected".equals(existing.status)) {
@@ -455,7 +467,7 @@ public final class TaRecruitService {
       logActivityUnsafe(logs, c, user.id, "application_submitted", "application", result.id,
           Map.of("job_id", jobId));
       saveAll(users, jobs, apps, null, null, logs, c);
-      return applicationOut(apps, jobs, users, result, readEvaluationsUnsafe(), null);
+      return applicationOut(apps, jobs, users, result, readEvaluationsUnsafe(), null, true);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -533,7 +545,7 @@ public final class TaRecruitService {
       return apps.stream()
           .filter(a -> a.ta_user_id == userId)
           .sorted(Comparator.comparing((ApplicationRecord a) -> a.created_at).reversed())
-          .map(a -> applicationOut(apps, jobs, users, a, evals, null))
+          .map(a -> applicationOut(apps, jobs, users, a, evals, null, true))
           .collect(Collectors.toList());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -616,7 +628,7 @@ public final class TaRecruitService {
       logActivityUnsafe(logs, c, userId, "application_withdrawn", "application", a.id,
           Map.of("job_id", a.job_id));
       saveAll(users, jobs, apps, null, null, logs, c);
-      return applicationOut(apps, jobs, users, a, readEvaluationsUnsafe(), null);
+      return applicationOut(apps, jobs, users, a, readEvaluationsUnsafe(), null, true);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -909,7 +921,7 @@ public final class TaRecruitService {
           .filter(a -> a.job_id == jobId)
           .filter(a -> st.isEmpty() || st.equalsIgnoreCase(a.status))
           .sorted(cmp)
-          .map(a -> applicationOut(apps, jobs, users, a, evals, cvFiles))
+          .map(a -> applicationOut(apps, jobs, users, a, evals, cvFiles, false))
           .collect(Collectors.toList());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -931,15 +943,15 @@ public final class TaRecruitService {
       Counters c = readCountersUnsafe();
       SettingsRecord settings = readSettingsMergedUnsafe();
       String status = requireStr(body.get("status"), "status");
-      if (!"accepted".equals(status) && !"rejected".equals(status)) {
-        throw new ApiException(400, "Only accepted or rejected allowed");
+      if (!"interviewing".equals(status) && !"accepted".equals(status) && !"rejected".equals(status)) {
+        throw new ApiException(400, "Status must be interviewing, accepted or rejected");
       }
       ApplicationRecord appRow = apps.stream().filter(a -> a.id == applicationId).findFirst().orElseThrow(
           () -> new ApiException(404, "Application not found"));
       JobRecord job = ensureOwnJob(jobs, appRow.job_id, mo.id);
       normalizeJob(job);
-      if (!"pending".equals(appRow.status)) {
-        throw new ApiException(400, "Application is not pending");
+      if (!isAllowedApplicationTransition(appRow.status, status)) {
+        throw new ApiException(400, "Invalid application status transition: " + appRow.status + " -> " + status);
       }
       if ("accepted".equals(status)) {
         int acc = acceptedCount(apps, job.id);
@@ -952,9 +964,23 @@ public final class TaRecruitService {
         warnings.addAll(computeAssignmentWarnings(users, assigns, jobs, job, appRow.ta_user_id, settings));
       }
       appRow.status = status;
-      appRow.decided_at = Instant.now();
-      String title = status.equals("accepted") ? "Application accepted" : "Application rejected";
-      String bodyText = "Your application for \"" + job.module_name + "\" was " + status + ".";
+      if ("accepted".equals(status) || "rejected".equals(status)) {
+        appRow.decided_at = Instant.now();
+      } else {
+        appRow.decided_at = null;
+      }
+      String title;
+      String bodyText;
+      if ("accepted".equals(status)) {
+        title = "Application accepted";
+        bodyText = "Your application for \"" + job.module_name + "\" was accepted.";
+      } else if ("rejected".equals(status)) {
+        title = "Application rejected";
+        bodyText = "Your application for \"" + job.module_name + "\" was rejected.";
+      } else {
+        title = "Application moved to interview";
+        bodyText = "Your application for \"" + job.module_name + "\" moved to interviewing.";
+      }
       NotificationRecord n = new NotificationRecord();
       n.id = c.notificationSeq++;
       n.user_id = appRow.ta_user_id;
@@ -1003,7 +1029,7 @@ public final class TaRecruitService {
       logActivityUnsafe(logs, c, mo.id, "application_" + status, "application", appRow.id, decisionLog);
       saveAll(users, jobs, apps, notifs, assigns, logs, c);
       Map<String, Object> res = new LinkedHashMap<>(
-          applicationOut(apps, jobs, users, appRow, readEvaluationsUnsafe(), readCvFilesUnsafe()));
+          applicationOut(apps, jobs, users, appRow, readEvaluationsUnsafe(), readCvFilesUnsafe(), false));
       res.put("warnings", warnings);
       return res;
     } catch (IOException e) {
@@ -1026,8 +1052,8 @@ public final class TaRecruitService {
     @SuppressWarnings("unchecked")
     List<Number> ids = (List<Number>) body.get("application_ids");
     String status = requireStr(body.get("status"), "status");
-    if (!"rejected".equals(status) && !"accepted".equals(status)) {
-      throw new ApiException(400, "status must be accepted or rejected");
+    if (!"rejected".equals(status) && !"accepted".equals(status) && !"interviewing".equals(status)) {
+      throw new ApiException(400, "status must be interviewing, accepted or rejected");
     }
     if (ids == null || ids.isEmpty()) {
       throw new ApiException(400, "application_ids required");
@@ -1090,11 +1116,9 @@ public final class TaRecruitService {
       SettingsRecord st = readSettingsMergedUnsafe();
       double cap = maxHoursParam != null ? maxHoursParam : st.overload_threshold_hours;
       List<UserRecord> users = readUsersUnsafe();
-      List<AssignmentRecord> assigns = readAssignmentsUnsafe();
-      Map<Integer, Double> totals = new LinkedHashMap<>();
-      for (AssignmentRecord a : assigns) {
-        totals.merge(a.ta_user_id, a.assigned_hours, Double::sum);
-      }
+      List<JobRecord> jobs = readJobsUnsafe();
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      Map<Integer, Double> totals = computeTaAppliedWeeklyHours(apps, jobs);
       return users.stream()
           .filter(u -> "ta".equals(u.role))
           .map(u -> {
@@ -1105,6 +1129,7 @@ public final class TaRecruitService {
             row.put("email", u.email);
             row.put("total_hours", th);
             row.put("overloaded", th > cap);
+            row.put("weekly_over_20", th > 20.0);
             return row;
           })
           .sorted(Comparator.comparing((Map<String, Object> m) -> (Double) m.get("total_hours")).reversed())
@@ -1230,10 +1255,10 @@ public final class TaRecruitService {
           .map(TaRecruitService::notificationOut)
           .collect(Collectors.toList());
       List<Map<String, Object>> recJobs = jobs.stream()
-          .filter(j -> isTaRecruitingSlot(j, apps))
+          .filter(j -> isTaRecruitingSlot(j, apps) && !taDeadlineClosed(j))
           .sorted(Comparator.comparing((JobRecord j) -> j.created_at).reversed())
           .limit(5)
-          .map(j -> jobOut(j, false, apps))
+          .map(j -> jobOut(j, false, apps, true))
           .collect(Collectors.toList());
       Map<String, Object> m = new LinkedHashMap<>();
       m.put("applications_total", mine);
@@ -1653,7 +1678,7 @@ public final class TaRecruitService {
 
   private static Map<String, Object> applicationOut(
       List<ApplicationRecord> allApps, List<JobRecord> jobs, List<UserRecord> users, ApplicationRecord a,
-      List<ApplicationEvaluationRecord> evals, List<CvFileRecord> cvFiles) {
+      List<ApplicationEvaluationRecord> evals, List<CvFileRecord> cvFiles, boolean taJobView) {
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("id", a.id);
     m.put("job_id", a.job_id);
@@ -1663,7 +1688,7 @@ public final class TaRecruitService {
     m.put("decided_at", a.decided_at);
     m.put("shortlist_tag", a.shortlist_tag != null ? a.shortlist_tag : "");
     JobRecord job = jobs.stream().filter(j -> j.id == a.job_id).findFirst().orElse(null);
-    m.put("job", job != null ? jobOut(job, false, allApps) : null);
+    m.put("job", job != null ? jobOut(job, false, allApps, taJobView) : null);
     UserRecord ta = users.stream().filter(u -> u.id == a.ta_user_id).findFirst().orElse(null);
     m.put("ta_display_name", ta != null ? ta.display_name : null);
     m.put("ta_email", ta != null ? ta.email : null);
@@ -1680,6 +1705,11 @@ public final class TaRecruitService {
   }
 
   private static Map<String, Object> jobOut(JobRecord j, boolean favorited, List<ApplicationRecord> apps) {
+    return jobOut(j, favorited, apps, false);
+  }
+
+  private static Map<String, Object> jobOut(
+      JobRecord j, boolean favorited, List<ApplicationRecord> apps, boolean taView) {
     normalizeJob(j);
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("id", j.id);
@@ -1687,7 +1717,7 @@ public final class TaRecruitService {
     m.put("requirements", j.requirements);
     m.put("deadline", j.deadline);
     m.put("skill_tags", j.skill_tags);
-    m.put("status", j.status);
+    m.put("status", taView && taDeadlineClosed(j) ? "closed" : j.status);
     m.put("assigned_hours", j.assigned_hours);
     m.put("created_by", j.created_by);
     m.put("created_at", j.created_at);
@@ -1774,6 +1804,36 @@ public final class TaRecruitService {
   private static boolean isTaRecruitingSlot(JobRecord j, List<ApplicationRecord> apps) {
     normalizeJob(j);
     return RECRUITING.contains(j.status) && acceptedCount(apps, j.id) < j.quota;
+  }
+
+  /** Workload checker: sum TA weekly hours from active applications by traversing JSON records. */
+  private static Map<Integer, Double> computeTaAppliedWeeklyHours(
+      List<ApplicationRecord> apps, List<JobRecord> jobs) {
+    Map<Integer, JobRecord> jobIndex = jobs.stream()
+        .collect(Collectors.toMap(j -> j.id, j -> j, (a, b) -> a, LinkedHashMap::new));
+    Map<Integer, Double> totals = new LinkedHashMap<>();
+    for (ApplicationRecord a : apps) {
+      if (!"pending".equals(a.status) && !"interviewing".equals(a.status) && !"accepted".equals(a.status)) {
+        continue;
+      }
+      JobRecord job = jobIndex.get(a.job_id);
+      if (job == null) {
+        continue;
+      }
+      normalizeJob(job);
+      totals.merge(a.ta_user_id, job.assigned_hours, Double::sum);
+    }
+    return totals;
+  }
+
+  /** TA-facing: deadline passed while job is still in a recruiting state (JSON may still say open, etc.). */
+  private static boolean taDeadlineClosed(JobRecord j) {
+    normalizeJob(j);
+    if (!RECRUITING.contains(j.status)) {
+      return false;
+    }
+    Optional<Instant> end = deadlineEndInstant(j.deadline);
+    return end.isPresent() && Instant.now().isAfter(end.get());
   }
 
   private static Comparator<JobRecord> jobComparator(String sortParam) {
@@ -1879,6 +1939,23 @@ public final class TaRecruitService {
       case "shortlist" -> Set.of("filled", "closed", "cancelled", "open").contains(to);
       case "filled" -> Set.of("closed").contains(to);
       case "closed", "cancelled" -> false;
+      default -> false;
+    };
+  }
+
+  /**
+   * Application status machine:
+   * pending(已申请) -> interviewing(面试中) -> accepted/rejected
+   * pending can also go directly to rejected; rejected/accepted/withdrawn are terminal.
+   */
+  private static boolean isAllowedApplicationTransition(String from, String to) {
+    if (from == null || to == null) {
+      return false;
+    }
+    return switch (from) {
+      case "pending" -> Set.of("interviewing", "rejected").contains(to);
+      case "interviewing" -> Set.of("accepted", "rejected").contains(to);
+      case "accepted", "rejected", "withdrawn" -> false;
       default -> false;
     };
   }
