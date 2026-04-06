@@ -33,7 +33,7 @@ export type JobStatus =
   | "closed"
   | "cancelled";
 
-export type ApplicationStatus = "pending" | "accepted" | "rejected" | "withdrawn";
+export type ApplicationStatus = "pending" | "interviewing" | "accepted" | "rejected" | "withdrawn";
 
 export interface Job {
   id: number;
@@ -108,6 +108,7 @@ export interface WorkloadRow {
   email: string;
   total_hours: number;
   overloaded: boolean;
+  weekly_over_20?: boolean;
 }
 
 export interface ActivityLog {

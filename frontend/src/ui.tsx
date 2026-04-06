@@ -133,7 +133,8 @@ export function Badge({
 
 export function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
-  if (s === "pending") return <Badge tone="warn" pill>待处理</Badge>;
+  if (s === "pending") return <Badge tone="warn" pill>已申请</Badge>;
+  if (s === "interviewing") return <Badge tone="info" pill>面试中</Badge>;
   if (s === "accepted") return <Badge tone="ok" pill>已录用</Badge>;
   if (s === "rejected") return <Badge tone="bad" pill>已拒绝</Badge>;
   if (s === "withdrawn") return <Badge tone="neutral" pill>已撤回</Badge>;
