@@ -5,6 +5,7 @@ import com.ebu6304.tarecruit.domain.UserRecord;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Locale;
 
 /**
  * Business logic around registration/login backed by JSON file storage.
@@ -22,6 +23,48 @@ public final class UserService {
 
   public static UserService forPath(Path usersPath) {
     return new UserService(UserDAO.forPath(usersPath));
+  }
+
+  /**
+   * Persists a new public TA account with a caller-assigned id (keeps {@code counters.json} in sync with the main app).
+   */
+  public UserRecord persistNewTa(int assignedUserId,
+                                 String email,
+                                 String plainPassword,
+                                 String displayName,
+                                 String studentId) {
+    requireEmail(email);
+    requirePassword(plainPassword);
+    if (dao.findByEmail(email).isPresent()) {
+      throw new IllegalArgumentException("Email already registered");
+    }
+    String sid = studentId != null ? studentId.strip() : "";
+    if (sid.isEmpty()) {
+      throw new IllegalArgumentException("student_id is required for TA");
+    }
+
+    UserRecord u = new UserRecord();
+    u.id = assignedUserId;
+    u.email = email.trim().toLowerCase(Locale.ROOT);
+    u.password_hash = Passwords.hash(plainPassword);
+    u.role = UserRole.TA.value();
+    u.display_name = (displayName == null || displayName.isBlank())
+        ? u.email.split("@")[0]
+        : displayName.trim();
+    u.student_id = sid;
+    u.skills = "";
+    u.cv_file_path = "";
+    u.created_at = Instant.now();
+    u.failed_login_attempts = 0;
+    u.locked_until = null;
+
+    dao.insert(u);
+    return sanitize(u);
+  }
+
+  /** BCrypt check for integrating with session / lockout logic outside this service. */
+  public boolean passwordMatches(String plainPassword, String storedHash) {
+    return Passwords.verify(plainPassword, storedHash);
   }
 
   public UserRecord register(String email,
@@ -43,7 +86,7 @@ public final class UserService {
 
     UserRecord u = new UserRecord();
     u.id = dao.nextUserId();
-    u.email = email.trim().toLowerCase();
+    u.email = email.trim().toLowerCase(Locale.ROOT);
     u.password_hash = Passwords.hash(plainPassword);
     u.role = role.value();
     u.display_name = (displayName == null || displayName.isBlank()) ? u.email.split("@")[0] : displayName.trim();

@@ -120,8 +120,9 @@ npm run dev
 
 - **数据文件**：`data/users.json`（可通过 `TA_DATA_DIR` / `-Dta.data.dir` 指向具体目录）；角色支持 `ta`、`mo`、`admin`。
 - **DAO 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserDAO.java`，负责 `users.json` 的读取/写入，默认单例 `getInstance()`，并用读写锁保护并发访问。
-- **Service 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserService.java`，提供 `register` / `login` 业务逻辑。
-- **密码安全**：注册时使用 BCrypt 哈希加盐（`Passwords.hash`），登录时使用 BCrypt 校验（`Passwords.verify`），不存明文密码。
+- **Service 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserService.java`，提供 `register` / `login` 业务逻辑，以及供主流程调用的 `persistNewTa`（指定用户 id，与 `counters.json` 对齐）、`passwordMatches`（登录验密）。
+- **与现有接口衔接**：`AuthServlet` 仍暴露 `/api/auth/register`、`/api/auth/login`；公开 **TA 注册** 时由 `TaRecruitService` 调用 `UserService.persistNewTa` 经 `UserDAO` 写入 `users.json`；**登录验密** 走 `UserService.passwordMatches`（BCrypt）。JWT 签发、活动日志与计数器仍由 `TaRecruitService` 统一处理。
+- **密码安全**：注册时使用 BCrypt 哈希加盐（`Passwords.hash`），登录时使用 BCrypt 校验（经 `UserService`/`Passwords.verify`），不存明文密码。
 - **测试**：`java-web/src/test/java/com/ebu6304/tarecruit/user/UserServiceTest.java`，覆盖注册加密、登录校验、重复邮箱、JSON 损坏错误处理。
 
 ## 体验与交互（前端已实现）

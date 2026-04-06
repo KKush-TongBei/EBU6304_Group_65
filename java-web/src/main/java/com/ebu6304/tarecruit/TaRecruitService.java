@@ -16,6 +16,7 @@ import com.ebu6304.tarecruit.domain.NotificationRecord;
 import com.ebu6304.tarecruit.domain.SettingsRecord;
 import com.ebu6304.tarecruit.domain.UserRecord;
 import com.ebu6304.tarecruit.store.AtomicJsonFile;
+import com.ebu6304.tarecruit.user.UserService;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.io.IOException;
@@ -57,6 +58,7 @@ public final class TaRecruitService {
   private final Path jobTemplatesPath;
   private final JwtHelper jwt;
   private final double maxTaHoursDefault;
+  private final UserService userAccounts;
   private final ReentrantReadWriteLock rw = new ReentrantReadWriteLock();
 
   private static final Set<String> RECRUITING = Set.of("open", "screening", "interview", "shortlist");
@@ -80,6 +82,7 @@ public final class TaRecruitService {
     this.jobTemplatesPath = dataDir.resolve("job_templates.json");
     this.jwt = jwt;
     this.maxTaHoursDefault = maxTaHoursDefault;
+    this.userAccounts = UserService.forPath(this.usersPath);
   }
 
   public Path getUploadsDir() {
@@ -175,42 +178,31 @@ public final class TaRecruitService {
   public Map<String, Object> register(Map<String, Object> body) {
     rw.writeLock().lock();
     try {
-      List<UserRecord> users = readUsersUnsafe();
       List<ActivityLogRecord> logs = readLogsUnsafe();
       Counters c = readCountersUnsafe();
       String email = requireStr(body.get("email"), "email");
       String password = requireStr(body.get("password"), "password");
-      validatePasswordStrength(password);
       String role = optStr(body.get("role"));
       if (role != null && !"ta".equalsIgnoreCase(role)) {
         throw new ApiException(403, "Public registration is only allowed for TA accounts");
-      }
-      role = "ta";
-      if (users.stream().anyMatch(u -> u.email.equalsIgnoreCase(email))) {
-        throw new ApiException(400, "Email already registered");
       }
       String studentId = optStr(body.get("student_id"));
       if (studentId == null || studentId.isBlank()) {
         throw new ApiException(400, "TA accounts require student_id");
       }
-      UserRecord u = new UserRecord();
-      u.id = c.userSeq++;
-      u.email = email;
-      u.password_hash = Passwords.hash(password);
-      u.role = "ta";
       String dn = optStr(body.get("display_name"));
-      u.display_name = (dn != null && !dn.isEmpty()) ? dn : email.split("@")[0];
-      u.student_id = studentId.strip();
-      u.skills = "";
-      u.cv_file_path = "";
-      u.created_at = Instant.now();
-      u.failed_login_attempts = 0;
-      u.locked_until = null;
-      users.add(u);
-      logActivityUnsafe(logs, c, u.id, "register", "user", u.id,
-          Map.of("email", u.email, "role", u.role));
-      saveAll(users, null, null, null, null, logs, c);
-      return tokenMap(u.id);
+      int newId = c.userSeq;
+      try {
+        userAccounts.persistNewTa(newId, email, password, dn, studentId.strip());
+      } catch (IllegalArgumentException ex) {
+        throw mapUserServiceToApi(ex);
+      }
+      c.userSeq = newId + 1;
+      String storedEmail = email.trim().toLowerCase(Locale.ROOT);
+      logActivityUnsafe(logs, c, newId, "register", "user", newId,
+          Map.of("email", storedEmail, "role", "ta"));
+      saveAll(null, null, null, null, null, logs, c);
+      return tokenMap(newId);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -278,7 +270,7 @@ public final class TaRecruitService {
       if (u.locked_until != null && u.locked_until.isAfter(Instant.now())) {
         throw new ApiException(423, "Account temporarily locked; try again later");
       }
-      if (!Passwords.verify(password, u.password_hash)) {
+      if (!userAccounts.passwordMatches(password, u.password_hash)) {
         u.failed_login_attempts = Math.min(u.failed_login_attempts + 1, 99);
         if (u.failed_login_attempts >= MAX_LOGIN_FAILS) {
           u.locked_until = Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES);
@@ -1742,6 +1734,14 @@ public final class TaRecruitService {
       m.put("missing_profile_fields", missing);
     }
     return m;
+  }
+
+  private static ApiException mapUserServiceToApi(IllegalArgumentException ex) {
+    String msg = ex.getMessage() != null ? ex.getMessage() : "Bad request";
+    if (msg.contains("password") || msg.contains("chars") || msg.contains("digits")) {
+      return new ApiException(422, msg);
+    }
+    return new ApiException(400, msg);
   }
 
   private static void validatePasswordStrength(String password) {
