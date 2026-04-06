@@ -184,7 +184,7 @@ export const api = {
       const q = sp.toString();
       return request<Application[]>(`/api/mo/jobs/${jobId}/applications${q ? `?${q}` : ""}`);
     },
-    batchDecide: (jobId: number, application_ids: number[], status: "accepted" | "rejected") =>
+    batchDecide: (jobId: number, application_ids: number[], status: "interviewing" | "accepted" | "rejected") =>
       request<{ updated: number; errors: string[] }>(`/api/mo/jobs/${jobId}/applications/batch`, {
         method: "POST",
         json: { application_ids, status },
@@ -194,7 +194,7 @@ export const api = {
         method: "POST",
         json: body,
       }),
-    decide: (applicationId: number, status: "accepted" | "rejected") =>
+    decide: (applicationId: number, status: "interviewing" | "accepted" | "rejected") =>
       request<Application & { warnings?: string[] }>(`/api/mo/applications/${applicationId}`, {
         method: "PATCH",
         json: { status },

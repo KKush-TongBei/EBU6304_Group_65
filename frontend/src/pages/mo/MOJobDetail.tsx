@@ -179,6 +179,13 @@ export default function MOJobDetail() {
     loadApps();
   }, [jobId, appSort, appStatusFilter]);
 
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      loadApps();
+    }, 8000);
+    return () => window.clearInterval(t);
+  }, [jobId, appSort, appStatusFilter]);
+
   const startEdit = () => {
     if (!job) return;
     const next = jobToForm(job);
@@ -260,17 +267,23 @@ export default function MOJobDetail() {
     }
   };
 
-  const decide = async (appId: number, status: "accepted" | "rejected") => {
+  const decide = async (appId: number, status: "interviewing" | "accepted" | "rejected") => {
     const ok = await confirm({
-      title: status === "accepted" ? "录用申请人" : "拒绝申请人",
-      message: status === "accepted" ? "确认录用该申请人？" : "确认拒绝该申请人？",
-      confirmText: status === "accepted" ? "录用" : "拒绝",
+      title:
+        status === "interviewing" ? "推进至面试中" : status === "accepted" ? "录用申请人" : "拒绝申请人",
+      message:
+        status === "interviewing"
+          ? "确认将该申请推进到面试中？"
+          : status === "accepted"
+          ? "确认录用该申请人？"
+          : "确认拒绝该申请人？",
+      confirmText: status === "interviewing" ? "推进" : status === "accepted" ? "录用" : "拒绝",
       danger: status === "rejected",
     });
     if (!ok) return;
     try {
       const res = await api.mo.decide(appId, status);
-      toast(status === "accepted" ? "已录用" : "已拒绝", "success");
+      toast(status === "interviewing" ? "已进入面试中" : status === "accepted" ? "已录用" : "已拒绝", "success");
       if (res.warnings?.length) {
         toast(res.warnings.join("；"), "info");
       }
@@ -290,14 +303,16 @@ export default function MOJobDetail() {
     });
   };
 
-  const batchDecide = async (status: "accepted" | "rejected") => {
+  const batchDecide = async (status: "interviewing" | "accepted" | "rejected") => {
     if (!job || selected.size === 0) {
       toast("请先勾选待处理的申请", "error");
       return;
     }
     const ok = await confirm({
-      title: status === "accepted" ? "批量录用" : "批量拒绝",
-      message: `将对 ${selected.size} 条申请执行${status === "accepted" ? "录用" : "拒绝"}，继续？`,
+      title: status === "interviewing" ? "批量推进至面试中" : status === "accepted" ? "批量录用" : "批量拒绝",
+      message: `将对 ${selected.size} 条申请执行${
+        status === "interviewing" ? "推进到面试中" : status === "accepted" ? "录用" : "拒绝"
+      }，继续？`,
       confirmText: "继续",
       danger: status === "rejected",
     });
@@ -352,9 +367,10 @@ export default function MOJobDetail() {
   const appStats = useMemo(() => {
     const total = apps.length;
     const pending = apps.filter((a) => a.status === "pending").length;
+    const interviewing = apps.filter((a) => a.status === "interviewing").length;
     const accepted = apps.filter((a) => a.status === "accepted").length;
     const rejected = apps.filter((a) => a.status === "rejected").length;
-    return { total, pending, accepted, rejected };
+    return { total, pending, interviewing, accepted, rejected };
   }, [apps]);
 
   const downloadApplicantCv = async (a: Application) => {
@@ -437,9 +453,10 @@ export default function MOJobDetail() {
         <p className="text-sm text-ink-500 dark:text-slate-400 mt-1">查看与处理本岗位的助教申请</p>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <StatCard title="申请总数" value={appStats.total} tone="neutral" />
-        <StatCard title="待处理" value={appStats.pending} tone="warn" />
+        <StatCard title="已申请" value={appStats.pending} tone="warn" />
+        <StatCard title="面试中" value={appStats.interviewing} tone="neutral" />
         <StatCard title="已录用" value={appStats.accepted} tone="ok" />
         <StatCard title="已拒绝" value={appStats.rejected} tone="bad" />
       </div>
@@ -451,7 +468,10 @@ export default function MOJobDetail() {
             当前阶段：<strong className="text-ink-950 dark:text-white">{job.status}</strong>
           </span>
           <span>
-            待审：<strong>{apps.filter((a) => a.status === "pending").length}</strong>
+            已申请：<strong>{apps.filter((a) => a.status === "pending").length}</strong>
+          </span>
+          <span>
+            面试中：<strong>{apps.filter((a) => a.status === "interviewing").length}</strong>
           </span>
           <span>
             已录用：<strong>{apps.filter((a) => a.status === "accepted").length}</strong>
@@ -642,7 +662,8 @@ export default function MOJobDetail() {
                 aria-label="按申请状态筛选"
               >
                 <option value="">全部</option>
-                <option value="pending">待处理</option>
+                <option value="pending">已申请</option>
+                <option value="interviewing">面试中</option>
                 <option value="accepted">已录用</option>
                 <option value="rejected">已拒绝</option>
                 <option value="withdrawn">已撤回</option>
@@ -650,6 +671,9 @@ export default function MOJobDetail() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" className="!py-2" onClick={() => batchDecide("interviewing")}>
+              批量面试中
+            </Button>
             <Button type="button" variant="outlineDanger" className="!py-2" onClick={() => batchDecide("rejected")}>
               批量拒绝所选
             </Button>
@@ -699,7 +723,7 @@ export default function MOJobDetail() {
                     }`}
                   >
                     <td className="px-2 py-3 text-center">
-                      {a.status === "pending" ? (
+                      {a.status === "pending" || a.status === "interviewing" ? (
                         <input
                           type="checkbox"
                           checked={selected.has(a.id)}
@@ -753,6 +777,26 @@ export default function MOJobDetail() {
                           {expandedEval === a.id ? "收起评分" : "评分"}
                         </Button>
                         {a.status === "pending" ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="!py-1.5 !px-2.5 text-xs"
+                              onClick={() => decide(a.id, "interviewing")}
+                            >
+                              面试中
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outlineDanger"
+                              className="!py-1.5 !px-2.5 text-xs"
+                              onClick={() => decide(a.id, "rejected")}
+                            >
+                              <IconX />
+                              拒绝
+                            </Button>
+                          </>
+                        ) : a.status === "interviewing" ? (
                           <>
                             <Button
                               type="button"
