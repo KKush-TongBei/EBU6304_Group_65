@@ -22,6 +22,15 @@ export default function TAApplications() {
     load();
   }, []);
 
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      api.ta.myApplications().then(setRows).catch(() => {
+        /* ignore transient polling errors */
+      });
+    }, 8000);
+    return () => window.clearInterval(t);
+  }, []);
+
   const withdraw = async (id: number) => {
     const ok = await confirm({
       title: "撤回申请",

@@ -5,6 +5,12 @@ import type { Application, ApplicationStatus, Job, JobStatus } from "../../types
 import AppShell from "../../AppShell";
 import { Button, Card, Input, ListSkeleton, Select, StatusBadge } from "../../ui";
 
+function jobAcceptingApplications(status: JobStatus): boolean {
+  return status === "open" || status === "screening" || status === "interview" || status === "shortlist";
+}
+
+type JobListScope = "open" | "closed";
+
 function applicationSummary(status: ApplicationStatus | undefined): string {
   if (!status) return "尚未申请";
   switch (status) {
@@ -30,6 +36,7 @@ export default function TAJobs() {
   const [sort, setSort] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [unappliedOnly, setUnappliedOnly] = useState(false);
+  const [listScope, setListScope] = useState<JobListScope>("open");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -39,7 +46,7 @@ export default function TAJobs() {
       api.jobs.list({
         q: q || undefined,
         skill: skill || undefined,
-        status: "open",
+        status: listScope,
         sort: sort || undefined,
         favorites_only: favoritesOnly,
         unapplied_only: unappliedOnly,
@@ -57,7 +64,9 @@ export default function TAJobs() {
 
   useEffect(() => {
     load();
-  }, []);
+    // 与「搜索」一致：切换开放/已关闭时按当前筛选重新拉取；不在此依赖 q/skill 以免输入即请求
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [listScope]);
 
   const appByJob = new Map(apps.map((a) => [a.job_id, a]));
 
@@ -98,6 +107,28 @@ export default function TAJobs() {
 
   return (
     <AppShell title="浏览岗位" role="ta">
+      <div className="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="岗位列表范围">
+        <Button
+          type="button"
+          variant={listScope === "open" ? "primary" : "outlineMuted"}
+          className={listScope === "open" ? "" : "border-slate-300 dark:border-slate-600"}
+          aria-selected={listScope === "open"}
+          role="tab"
+          onClick={() => setListScope("open")}
+        >
+          开放岗位
+        </Button>
+        <Button
+          type="button"
+          variant={listScope === "closed" ? "primary" : "outlineMuted"}
+          className={listScope === "closed" ? "" : "border-slate-300 dark:border-slate-600"}
+          aria-selected={listScope === "closed"}
+          role="tab"
+          onClick={() => setListScope("closed")}
+        >
+          已关闭
+        </Button>
+      </div>
       <Card className="p-4 mb-6">
         <form onSubmit={onSearchSubmit} className="flex flex-col gap-4">
           <div className="flex flex-wrap gap-3 items-end">
@@ -154,12 +185,15 @@ export default function TAJobs() {
       {loading ? (
         <ListSkeleton rows={5} />
       ) : jobs.length === 0 ? (
-        <Card className="p-12 text-center text-ink-500 dark:text-slate-400">未找到符合条件的开放岗位。</Card>
+        <Card className="p-12 text-center text-ink-500 dark:text-slate-400">
+          {listScope === "open" ? "未找到符合条件的开放岗位。" : "暂无已关闭岗位（含截止停招、满员、教师关闭等）。"}
+        </Card>
       ) : (
         <div className="space-y-4">
           {jobs.map((j) => {
             const existing = appByJob.get(j.id);
             const showApply = !existing || existing.status === "withdrawn";
+            const canApply = showApply && jobAcceptingApplications(j.status);
             return (
               <Card key={j.id} className="p-5 hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
                 <div className="flex flex-wrap justify-between gap-3">
@@ -198,7 +232,7 @@ export default function TAJobs() {
                   <p className="text-xs text-ink-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">时段：{j.schedule_text}</p>
                 ) : null}
                 <div className="mt-4">
-                  {showApply ? (
+                  {canApply ? (
                     <Button onClick={() => apply(j.id)}>申请</Button>
                   ) : existing?.status === "pending" ? (
                     <span className="text-sm text-ink-500 dark:text-slate-400">

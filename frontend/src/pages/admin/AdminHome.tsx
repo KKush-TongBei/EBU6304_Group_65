@@ -47,7 +47,7 @@ export default function AdminHome() {
   const riskAlerts = Array.isArray(dash?.risk_alerts) ? (dash!.risk_alerts as string[]) : [];
 
   return (
-    <AppShell title="管理员 · 工作量" role="admin">
+    <AppShell title="管理员 · 总览" role="admin">
       {dash ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <Card className="p-4">
@@ -163,9 +163,19 @@ export default function AdminHome() {
                   </td>
                   <td className="px-4 py-3">
                     {r.overloaded ? (
-                      <Badge tone="bad">超负荷</Badge>
+                      <span className="inline-flex items-center gap-2">
+                        <Badge tone="bad">超负荷</Badge>
+                        {r.weekly_over_20 && (
+                          <span className="text-xs font-semibold text-red-700 dark:text-red-400">超过20h/周预警</span>
+                        )}
+                      </span>
                     ) : (
-                      <Badge tone="ok">正常</Badge>
+                      <span className="inline-flex items-center gap-2">
+                        <Badge tone="ok">正常</Badge>
+                        {r.weekly_over_20 && (
+                          <span className="text-xs font-semibold text-red-700 dark:text-red-400">超过20h/周预警</span>
+                        )}
+                      </span>
                     )}
                   </td>
                 </tr>

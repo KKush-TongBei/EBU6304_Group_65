@@ -38,6 +38,23 @@ Tie Wang 231226543 gitid:WANGNNNnnn
 
 **Cursor / VS Code**：打开仓库根目录后，可安装工作区推荐的 **Extension Pack for Java**；`.vscode/settings.json` 已指向 `.tools` 下的 JDK 17（若路径不存在请在设置里改成本机 JDK）。
 
+### 管理员登录（组内开发 / 演示）
+
+前端**公开注册**仅可创建 **TA**；管理员需在数据里已存在。组内约定使用下列**演示账号**登录后台（在项目根目录执行脚本时，数据目录一般为 `java-web/data/`）：
+
+| | |
+|---|---|
+| **邮箱** | `zyx1678162910@gmail.com` |
+| **密码** | `admin123456` |
+
+**说明：**
+
+- 仅用于**本地与课程演示**，勿用于公网或真实生产环境；提交作业 ZIP 时请按课程要求处理数据，勿泄露敏感信息。
+- 若你本地 **`java-web/data/users.json`** 里还没有该管理员：可向组长索取含该用户的 `users.json` 片段；或在**当前没有任何 admin 用户**时，启动后端前执行  
+  `export TA_SEED_ADMIN_EMAIL=zyx1678162910@gmail.com`  
+  `export TA_SEED_ADMIN_PASSWORD=admin123456`  
+  再运行 Tomcat / `./scripts/tomcat-run.sh`，系统会在首次启动时自动创建该管理员。
+
 ### 1. 构建 WAR
 
 ```bash
@@ -93,9 +110,22 @@ npm run dev
 
 开发服务器默认 `http://localhost:5173`。Vite 将浏览器请求 **`/api/*`** 转发到 **`http://127.0.0.1:8080/ta-recruit/api/*`**（与 [`frontend/vite.config.ts`](frontend/vite.config.ts) 中配置一致）。若你将 WAR 部署为 **ROOT**（无 `/ta-recruit` 前缀）或使用了其他 context path，请相应修改 `vite.config.ts` / `vite.config.js` 里的 `rewrite` 与 `target`。
 
+可选：若本机未装 Node，可将 Node 解压到仓库约定路径后使用 [`scripts/frontend-run.sh`](scripts/frontend-run.sh) 启动 Vite（脚本内说明路径约定）。
+
 ### 7. 生产构建（前端指向独立 API 或嵌入 WAR）
 
 若前端与后端不同源部署，设置 **`VITE_API_BASE`** 为 API 根 URL（无尾部斜杠），再 `npm run build`。参见 [`frontend/.env.example`](frontend/.env.example)。嵌入 WAR 时按上文「前端嵌入 WAR」使用 `VITE_API_BASE=` 即可。
+
+## 用户管理模块（JSON + BCrypt）
+
+为满足课程“禁止数据库、使用本地文件”的要求，新增了独立用户模块：
+
+- **数据文件**：`data/users.json`（可通过 `TA_DATA_DIR` / `-Dta.data.dir` 指向具体目录）；角色支持 `ta`、`mo`、`admin`。
+- **DAO 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserDAO.java`，负责 `users.json` 的读取/写入，默认单例 `getInstance()`，并用读写锁保护并发访问。
+- **Service 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserService.java`，提供 `register` / `login` 业务逻辑，以及供主流程调用的 `persistNewTa`（指定用户 id，与 `counters.json` 对齐）、`passwordMatches`（登录验密）。
+- **与现有接口衔接**：`AuthServlet` 仍暴露 `/api/auth/register`、`/api/auth/login`；公开 **TA 注册** 时由 `TaRecruitService` 调用 `UserService.persistNewTa` 经 `UserDAO` 写入 `users.json`；**管理员创建 MO/Admin**（`/api/admin/users`）与 **环境变量种子管理员**（`ensureSeedAdmin`）同样经 `UserService.persistNewStaff` 写入同一 `users.json`，与公开注册路径一致。**登录验密** 走 `UserService.passwordMatches`（BCrypt）。JWT 签发、活动日志与计数器仍由 `TaRecruitService` 统一处理。
+- **密码安全**：注册时使用 BCrypt 哈希加盐（`Passwords.hash`），登录时使用 BCrypt 校验（经 `UserService`/`Passwords.verify`），不存明文密码。
+- **测试**：`java-web/src/test/java/com/ebu6304/tarecruit/user/UserServiceTest.java`，覆盖注册加密、登录校验、重复邮箱、JSON 损坏错误处理。
 
 ## 体验与交互（前端已实现）
 
@@ -103,15 +133,15 @@ npm run dev
 - 全局 Toast、危险操作确认框（替代浏览器原生 `alert` / `confirm`）  
 - 列表加载指示与骨架、表格斑马纹与表头可访问性（`scope`）  
 - **TA**：通知支持「仅未读」「最近 7 天」、单条/全部标已读；Dashboard 展示规则型提示（截止临近、资料待补）；Token 过期自动跳转登录并提示  
-- **MO**：**岗位模板**（内置 + 可保存个人模板）、招聘管道概览与状态流转；编辑岗位未保存时离开页面会拦截路由；导出 CSV、录用/拒绝等操作有成功/失败提示  
-- **Admin**：工作量表格可单独刷新；超负荷行高亮；活动日志支持 **实体类型** 筛选与风险行高亮；系统设置含默认岗位名额与学期标签  
+- **MO**：**岗位模板**（内置 + 可保存个人模板）、招聘管道概览与状态流转；**申请状态机**（已申请 → 面试中 → 已录用/已拒绝，且拒绝后不可再录用）；编辑岗位未保存时离开页面会拦截路由；导出 CSV、状态操作有成功/失败提示  
+- **Admin**：总览页标题为「管理员 · 总览」；工作量表按 TA **有效申请**汇总岗位预估工时，可设超负荷阈值，**超过 20h/周** 时红色预警；表格可单独刷新；活动日志支持 **实体类型** 筛选与风险行高亮；系统设置含默认岗位名额与学期标签  
 - **全角色**：导航栏 **通知** 入口与未读角标（依赖 `/api/notifications`）  
 
 ## 功能概览（非 AI）
 
-- **TA**：资料与简历上传（Base64 文本存储）、浏览/搜索岗位、申请与撤回待处理申请、Dashboard 与规则型岗位提示  
+- **TA**：资料与简历上传（Base64 文本存储）、浏览/搜索岗位（**开放岗位 / 已关闭**）、岗位过截止日后视为已关闭且不可申请、申请与撤回待处理申请、Dashboard 与规则型岗位提示  
 - **MO**：模板发帖、发布/编辑/关闭岗位、流程推进、申请人评分卡、录用/拒绝（日志带评估摘要）、按岗位导出 CSV  
-- **Admin**：各助教累计工时、Dashboard 洞察、超负荷高亮、全量工时 CSV、活动日志筛选与导出  
+- **Admin**：各助教累计工时（按申请汇总岗位 `assigned_hours`）、Dashboard 洞察、超负荷与 **>20h/周** 预警、全量工时 CSV、活动日志筛选与导出  
 
 **终期提交 ZIP 建议**：勿打包 `node_modules`、`frontend/dist`（若已嵌入 WAR 可二选一说明）、本地 `data/`；保留源码与可复现 README。
 
