@@ -38,6 +38,23 @@ Tie Wang 231226543 gitid:WANGNNNnnn
 
 **Cursor / VS Code**：打开仓库根目录后，可安装工作区推荐的 **Extension Pack for Java**；`.vscode/settings.json` 已指向 `.tools` 下的 JDK 17（若路径不存在请在设置里改成本机 JDK）。
 
+### 管理员登录（组内开发 / 演示）
+
+前端**公开注册**仅可创建 **TA**；管理员需在数据里已存在。组内约定使用下列**演示账号**登录后台（在项目根目录执行脚本时，数据目录一般为 `java-web/data/`）：
+
+| | |
+|---|---|
+| **邮箱** | `zyx1678162910@gmail.com` |
+| **密码** | `admin123456` |
+
+**说明：**
+
+- 仅用于**本地与课程演示**，勿用于公网或真实生产环境；提交作业 ZIP 时请按课程要求处理数据，勿泄露敏感信息。
+- 若你本地 **`java-web/data/users.json`** 里还没有该管理员：可向组长索取含该用户的 `users.json` 片段；或在**当前没有任何 admin 用户**时，启动后端前执行  
+  `export TA_SEED_ADMIN_EMAIL=zyx1678162910@gmail.com`  
+  `export TA_SEED_ADMIN_PASSWORD=admin123456`  
+  再运行 Tomcat / `./scripts/tomcat-run.sh`，系统会在首次启动时自动创建该管理员。
+
 ### 1. 构建 WAR
 
 ```bash
@@ -96,6 +113,16 @@ npm run dev
 ### 7. 生产构建（前端指向独立 API 或嵌入 WAR）
 
 若前端与后端不同源部署，设置 **`VITE_API_BASE`** 为 API 根 URL（无尾部斜杠），再 `npm run build`。参见 [`frontend/.env.example`](frontend/.env.example)。嵌入 WAR 时按上文「前端嵌入 WAR」使用 `VITE_API_BASE=` 即可。
+
+## 用户管理模块（JSON + BCrypt）
+
+为满足课程“禁止数据库、使用本地文件”的要求，新增了独立用户模块：
+
+- **数据文件**：`data/users.json`（可通过 `TA_DATA_DIR` / `-Dta.data.dir` 指向具体目录）；角色支持 `ta`、`mo`、`admin`。
+- **DAO 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserDAO.java`，负责 `users.json` 的读取/写入，默认单例 `getInstance()`，并用读写锁保护并发访问。
+- **Service 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserService.java`，提供 `register` / `login` 业务逻辑。
+- **密码安全**：注册时使用 BCrypt 哈希加盐（`Passwords.hash`），登录时使用 BCrypt 校验（`Passwords.verify`），不存明文密码。
+- **测试**：`java-web/src/test/java/com/ebu6304/tarecruit/user/UserServiceTest.java`，覆盖注册加密、登录校验、重复邮箱、JSON 损坏错误处理。
 
 ## 体验与交互（前端已实现）
 
