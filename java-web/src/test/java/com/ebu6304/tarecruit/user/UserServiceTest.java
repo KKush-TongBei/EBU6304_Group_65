@@ -73,4 +73,26 @@ class UserServiceTest {
     assertThrows(IllegalArgumentException.class,
         () -> service.register("same@test.edu", "Abcd1234", UserRole.TA, "B", "2025003"));
   }
+
+  @Test
+  void persistNewStaffWritesMoWithAssignedId() throws Exception {
+    Path usersPath = tempDir.resolve("users.json");
+    UserService service = UserService.forPath(usersPath);
+    UserRecord out = service.persistNewStaff(7, "mo7@test.edu", "Mo123456", UserRole.MO, "MO Seven", null);
+    assertEquals(7, out.id);
+    assertEquals("mo", out.role);
+    assertNull(out.password_hash);
+
+    List<UserRecord> saved = AtomicJsonFile.readList(usersPath, new TypeReference<List<UserRecord>>() {}, new ArrayList<>());
+    assertEquals(1, saved.size());
+    assertTrue(Passwords.verify("Mo123456", saved.get(0).password_hash));
+  }
+
+  @Test
+  void persistNewStaffRejectsTaRole() {
+    Path usersPath = tempDir.resolve("users.json");
+    UserService service = UserService.forPath(usersPath);
+    assertThrows(IllegalArgumentException.class,
+        () -> service.persistNewStaff(1, "ta@test.edu", "Abcd1234", UserRole.TA, "T", "2025001"));
+  }
 }
