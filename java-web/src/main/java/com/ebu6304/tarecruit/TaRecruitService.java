@@ -2,7 +2,6 @@ package com.ebu6304.tarecruit;
 
 import com.ebu6304.tarecruit.api.ApiException;
 import com.ebu6304.tarecruit.auth.JwtHelper;
-import com.ebu6304.tarecruit.auth.Passwords;
 import com.ebu6304.tarecruit.domain.ActivityLogRecord;
 import com.ebu6304.tarecruit.domain.ApplicationEvaluationRecord;
 import com.ebu6304.tarecruit.domain.ApplicationRecord;
@@ -16,6 +15,7 @@ import com.ebu6304.tarecruit.domain.NotificationRecord;
 import com.ebu6304.tarecruit.domain.SettingsRecord;
 import com.ebu6304.tarecruit.domain.UserRecord;
 import com.ebu6304.tarecruit.store.AtomicJsonFile;
+import com.ebu6304.tarecruit.user.UserRole;
 import com.ebu6304.tarecruit.user.UserService;
 import com.fasterxml.jackson.core.type.TypeReference;
 
@@ -138,19 +138,16 @@ public final class TaRecruitService {
       }
       List<ActivityLogRecord> logs = readLogsUnsafe();
       Counters c = readCountersUnsafe();
-      UserRecord u = new UserRecord();
-      u.id = c.userSeq++;
-      u.email = email.trim();
-      u.password_hash = Passwords.hash(password);
-      u.role = "admin";
-      u.display_name = "Administrator";
-      u.student_id = null;
-      u.skills = "";
-      u.cv_file_path = "";
-      u.created_at = Instant.now();
-      users.add(u);
-      logActivityUnsafe(logs, c, u.id, "seed_admin", "user", u.id, Map.of("email", u.email));
-      saveAll(users, null, null, null, null, logs, c);
+      int newId = c.userSeq;
+      try {
+        userAccounts.persistNewStaff(newId, email.trim(), password, UserRole.ADMIN, "Administrator", null);
+      } catch (IllegalArgumentException ex) {
+        return;
+      }
+      c.userSeq = newId + 1;
+      String storedEmail = email.trim().toLowerCase(Locale.ROOT);
+      logActivityUnsafe(logs, c, newId, "seed_admin", "user", newId, Map.of("email", storedEmail));
+      saveAll(null, null, null, null, null, logs, c);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -214,40 +211,35 @@ public final class TaRecruitService {
     rw.writeLock().lock();
     try {
       requireRole(requireUserUnsafe(readUsersUnsafe(), adminId), "admin");
-      List<UserRecord> users = readUsersUnsafe();
       List<ActivityLogRecord> logs = readLogsUnsafe();
       Counters c = readCountersUnsafe();
       String email = requireStr(body.get("email"), "email");
       String password = requireStr(body.get("password"), "password");
-      validatePasswordStrength(password);
-      String role = requireStr(body.get("role"), "role");
-      if (!"mo".equals(role) && !"admin".equals(role)) {
+      String roleStr = requireStr(body.get("role"), "role");
+      UserRole role;
+      try {
+        role = UserRole.fromString(roleStr);
+      } catch (IllegalArgumentException ex) {
         throw new ApiException(422, "role must be mo or admin");
       }
-      if (users.stream().anyMatch(u -> u.email.equalsIgnoreCase(email))) {
-        throw new ApiException(400, "Email already registered");
+      if (role != UserRole.MO && role != UserRole.ADMIN) {
+        throw new ApiException(422, "role must be mo or admin");
       }
-      UserRecord u = new UserRecord();
-      u.id = c.userSeq++;
-      u.email = email;
-      u.password_hash = Passwords.hash(password);
-      u.role = role;
       String dn = optStr(body.get("display_name"));
-      u.display_name = (dn != null && !dn.isEmpty()) ? dn : email.split("@")[0];
-      u.student_id = optStr(body.get("student_id"));
-      if ("ta".equals(role) && (u.student_id == null || u.student_id.isBlank())) {
-        throw new ApiException(400, "student_id required for TA");
+      String studentId = optStr(body.get("student_id"));
+      int newId = c.userSeq;
+      try {
+        userAccounts.persistNewStaff(newId, email, password, role, dn, studentId);
+      } catch (IllegalArgumentException ex) {
+        throw mapUserServiceToApi(ex);
       }
-      u.skills = "";
-      u.cv_file_path = "";
-      u.created_at = Instant.now();
-      u.failed_login_attempts = 0;
-      u.locked_until = null;
-      users.add(u);
-      logActivityUnsafe(logs, c, adminId, "user_created_by_admin", "user", u.id,
-          Map.of("email", u.email, "role", u.role));
-      saveAll(users, null, null, null, null, logs, c);
-      return userOut(u);
+      c.userSeq = newId + 1;
+      String storedEmail = email.trim().toLowerCase(Locale.ROOT);
+      logActivityUnsafe(logs, c, adminId, "user_created_by_admin", "user", newId,
+          Map.of("email", storedEmail, "role", role.value()));
+      saveAll(null, null, null, null, null, logs, c);
+      UserRecord fresh = requireUserUnsafe(readUsersUnsafe(), newId);
+      return userOut(fresh);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {

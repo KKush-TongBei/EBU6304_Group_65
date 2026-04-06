@@ -33,25 +33,55 @@ public final class UserService {
                                  String plainPassword,
                                  String displayName,
                                  String studentId) {
+    return insertAssignedUser(assignedUserId, email, plainPassword, UserRole.TA, displayName, studentId);
+  }
+
+  /**
+   * Persists MO or Admin created by an existing administrator; same JSON path as public TA registration.
+   */
+  public UserRecord persistNewStaff(int assignedUserId,
+                                    String email,
+                                    String plainPassword,
+                                    UserRole role,
+                                    String displayName,
+                                    String studentId) {
+    if (role != UserRole.MO && role != UserRole.ADMIN) {
+      throw new IllegalArgumentException("role must be mo or admin");
+    }
+    return insertAssignedUser(assignedUserId, email, plainPassword, role, displayName, studentId);
+  }
+
+  private UserRecord insertAssignedUser(int assignedUserId,
+                                        String email,
+                                        String plainPassword,
+                                        UserRole role,
+                                        String displayName,
+                                        String studentId) {
     requireEmail(email);
     requirePassword(plainPassword);
     if (dao.findByEmail(email).isPresent()) {
       throw new IllegalArgumentException("Email already registered");
     }
-    String sid = studentId != null ? studentId.strip() : "";
-    if (sid.isEmpty()) {
-      throw new IllegalArgumentException("student_id is required for TA");
+    if (role == UserRole.TA) {
+      String sid = studentId != null ? studentId.strip() : "";
+      if (sid.isEmpty()) {
+        throw new IllegalArgumentException("student_id is required for TA");
+      }
     }
 
     UserRecord u = new UserRecord();
     u.id = assignedUserId;
     u.email = email.trim().toLowerCase(Locale.ROOT);
     u.password_hash = Passwords.hash(plainPassword);
-    u.role = UserRole.TA.value();
+    u.role = role.value();
     u.display_name = (displayName == null || displayName.isBlank())
         ? u.email.split("@")[0]
         : displayName.trim();
-    u.student_id = sid;
+    if (role == UserRole.TA) {
+      u.student_id = studentId.strip();
+    } else {
+      u.student_id = (studentId != null && !studentId.isBlank()) ? studentId.strip() : null;
+    }
     u.skills = "";
     u.cv_file_path = "";
     u.created_at = Instant.now();
