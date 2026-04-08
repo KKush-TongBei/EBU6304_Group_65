@@ -1,0 +1,16 @@
+package com.ebu6304.tarecruit.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import java.time.Instant;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class AssignmentRecord {
+  public int id;
+  public int ta_user_id;
+  public int job_id;
+  public int application_id;
+  public double assigned_hours;
+  public String term = "2025-2026-1";
+  public Instant created_at;
+}
