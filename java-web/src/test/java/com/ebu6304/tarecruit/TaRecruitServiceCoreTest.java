@@ -1,0 +1,306 @@
+package com.ebu6304.tarecruit;
+
+import com.ebu6304.tarecruit.api.ApiException;
+import com.ebu6304.tarecruit.auth.JwtHelper;
+import com.ebu6304.tarecruit.auth.Passwords;
+import com.ebu6304.tarecruit.domain.Counters;
+import com.ebu6304.tarecruit.domain.ApplicationRecord;
+import com.ebu6304.tarecruit.domain.JobRecord;
+import com.ebu6304.tarecruit.domain.UserRecord;
+import com.ebu6304.tarecruit.store.AtomicJsonFile;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class TaRecruitServiceCoreTest {
+
+  @TempDir
+  Path dataDir;
+
+  private TaRecruitService svc;
+  private JwtHelper jwt;
+
+  @BeforeEach
+  void setUp() throws Exception {
+    jwt = new JwtHelper("01234567890123456789012345678901", 1440);
+    svc = new TaRecruitService(dataDir, jwt, 20.0);
+    svc.initEmptyFiles();
+    seedUsers();
+  }
+
+  private void seedUsers() throws Exception {
+    List<UserRecord> users = new ArrayList<>();
+    Counters c = new Counters();
+    c.userSeq = 4;
+    c.jobSeq = 1;
+    c.applicationSeq = 1;
+    c.notificationSeq = 1;
+    c.activityLogSeq = 1;
+    c.evaluationSeq = 1;
+    c.assignmentSeq = 1;
+    c.cvFileSeq = 1;
+
+    UserRecord admin = new UserRecord();
+    admin.id = 1;
+    admin.email = "admin@test.edu";
+    admin.password_hash = Passwords.hash("Admin12345");
+    admin.role = "admin";
+    admin.display_name = "Admin";
+    admin.created_at = Instant.now();
+    users.add(admin);
+
+    UserRecord mo = new UserRecord();
+    mo.id = 2;
+    mo.email = "mo@test.edu";
+    mo.password_hash = Passwords.hash("Mo123456");
+    mo.role = "mo";
+    mo.display_name = "MO";
+    mo.created_at = Instant.now();
+    users.add(mo);
+
+    UserRecord ta = new UserRecord();
+    ta.id = 3;
+    ta.email = "ta@test.edu";
+    ta.password_hash = Passwords.hash("Ta123456");
+    ta.role = "ta";
+    ta.display_name = "TA";
+    ta.student_id = "2025001";
+    ta.skills = "python, java";
+    ta.created_at = Instant.now();
+    users.add(ta);
+
+    AtomicJsonFile.writeAtomic(dataDir.resolve("users.json"), users);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+  }
+
+  @Test
+  void healthIncludesStatusVersionAndDataDir() {
+    Map<String, String> h = svc.health();
+    assertEquals("ok", h.get("status"));
+    assertEquals("1.0.0", h.get("version"));
+    assertTrue(h.containsKey("time"));
+    assertTrue(h.containsKey("java"));
+    assertEquals(dataDir.toAbsolutePath().normalize().toString(), h.get("data_dir"));
+  }
+
+  @Test
+  void registerRejectsNonTaRole() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "x@y.z");
+    body.put("password", "Abcd1234");
+    body.put("student_id", "2025999");
+    body.put("role", "admin");
+    ApiException ex = assertThrows(ApiException.class, () -> svc.register(body));
+    assertEquals(403, ex.status);
+  }
+
+  @Test
+  void taRegisterSucceeds() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "newta@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("student_id", "2025888");
+    Map<String, Object> tok = assertDoesNotThrow(() -> svc.register(body));
+    assertTrue(tok.containsKey("access_token"));
+  }
+
+  @Test
+  void applyRejectedAfterDeadline() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "Test";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.deadline = "2000-01-01";
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    ApiException ex = assertThrows(ApiException.class, () -> svc.applyJob(3, 1));
+    assertEquals(400, ex.status);
+    assertTrue(ex.getMessage().contains("deadline"));
+  }
+
+  @Test
+  void adminWorkloadCountsActiveApplicationsAndOver20Warning() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j1 = new JobRecord();
+    j1.id = 1;
+    j1.module_name = "J1";
+    j1.status = "open";
+    j1.created_by = 2;
+    j1.assigned_hours = 12;
+    j1.quota = 3;
+    j1.created_at = Instant.now();
+    j1.updated_at = Instant.now();
+    jobs.add(j1);
+    JobRecord j2 = new JobRecord();
+    j2.id = 2;
+    j2.module_name = "J2";
+    j2.status = "open";
+    j2.created_by = 2;
+    j2.assigned_hours = 10;
+    j2.quota = 3;
+    j2.created_at = Instant.now();
+    j2.updated_at = Instant.now();
+    jobs.add(j2);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+
+    List<ApplicationRecord> apps = new ArrayList<>();
+    ApplicationRecord a1 = new ApplicationRecord();
+    a1.id = 1;
+    a1.job_id = 1;
+    a1.ta_user_id = 3;
+    a1.status = "pending";
+    a1.created_at = Instant.now();
+    apps.add(a1);
+    ApplicationRecord a2 = new ApplicationRecord();
+    a2.id = 2;
+    a2.job_id = 2;
+    a2.ta_user_id = 3;
+    a2.status = "accepted";
+    a2.created_at = Instant.now();
+    apps.add(a2);
+    ApplicationRecord a3 = new ApplicationRecord();
+    a3.id = 3;
+    a3.job_id = 2;
+    a3.ta_user_id = 3;
+    a3.status = "withdrawn";
+    a3.created_at = Instant.now();
+    apps.add(a3);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("applications.json"), apps);
+
+    Map<String, Object> row = svc.adminWorkload(1, 20.0).stream()
+        .filter(r -> ((Number) r.get("ta_user_id")).intValue() == 3)
+        .findFirst()
+        .orElseThrow();
+    assertEquals(22.0, ((Number) row.get("total_hours")).doubleValue(), 0.0001);
+    assertEquals(true, row.get("overloaded"));
+    assertEquals(true, row.get("weekly_over_20"));
+  }
+
+  @Test
+  void taListJobsDeadlineExpiredShowsClosedAndExcludesFromOpen() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "PastDeadline";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.deadline = "2000-01-01";
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    assertTrue(svc.listJobs(3, null, null, "open", null, null, null).stream().noneMatch(m -> m.get("id").equals(1)));
+    Map<String, Object> closedRow = svc.listJobs(3, null, null, "closed", null, null, null).stream()
+        .filter(m -> m.get("id").equals(1))
+        .findFirst()
+        .orElseThrow();
+    assertEquals("closed", closedRow.get("status"));
+
+    Map<String, Object> allRow = svc.listJobs(3, null, null, "all", null, null, null).stream()
+        .filter(m -> m.get("id").equals(1))
+        .findFirst()
+        .orElseThrow();
+    assertEquals("closed", allRow.get("status"));
+  }
+
+  @Test
+  void moListJobsKeepsTrueStatusWhenDeadlinePassed() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "MoStillOpenInDb";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.deadline = "2000-01-01";
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    Map<String, Object> row = svc.moJobs(2, "").stream()
+        .filter(m -> m.get("id").equals(1))
+        .findFirst()
+        .orElseThrow();
+    assertEquals("open", row.get("status"));
+  }
+
+  @Test
+  void moCannotAccessOtherMoJob() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 10;
+    j.module_name = "Other";
+    j.status = "open";
+    j.created_by = 99;
+    j.quota = 1;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+
+    ApiException ex = assertThrows(ApiException.class, () -> svc.moJobApplicants(2, 10, null, null));
+    assertEquals(403, ex.status);
+  }
+
+  @Test
+  void applicationStatusMachineEnforced() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "StatusMachine";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    Map<String, Object> app = svc.applyJob(3, 1);
+    int appId = ((Number) app.get("id")).intValue();
+
+    Map<String, Object> interviewing = svc.moDecideApplication(2, appId, Map.of("status", "interviewing"));
+    assertEquals("interviewing", interviewing.get("status"));
+
+    Map<String, Object> accepted = svc.moDecideApplication(2, appId, Map.of("status", "accepted"));
+    assertEquals("accepted", accepted.get("status"));
+
+    ApiException ex = assertThrows(ApiException.class,
+        () -> svc.moDecideApplication(2, appId, Map.of("status", "rejected")));
+    assertEquals(400, ex.status);
+    assertTrue(ex.getMessage().contains("Invalid application status transition"));
+  }
+}
