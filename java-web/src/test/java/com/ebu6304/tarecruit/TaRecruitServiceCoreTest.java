@@ -103,7 +103,7 @@ class TaRecruitServiceCoreTest {
     body.put("student_id", "2025999");
     body.put("role", "admin");
     ApiException ex = assertThrows(ApiException.class, () -> svc.register(body));
-    assertEquals(403, ex.status);
+    assertEquals(422, ex.status);
   }
 
   @Test
@@ -112,8 +112,31 @@ class TaRecruitServiceCoreTest {
     body.put("email", "newta@test.edu");
     body.put("password", "Abcd1234");
     body.put("student_id", "2025888");
+    body.put("role", "TA");
     Map<String, Object> tok = assertDoesNotThrow(() -> svc.register(body));
     assertTrue(tok.containsKey("access_token"));
+  }
+
+  @Test
+  void moRegisterSucceedsAndStoresRoleWithHashedPassword() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "newmo@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("display_name", "New MO");
+    body.put("student_id", "MO-1001");
+    body.put("role", "MO");
+    Map<String, Object> tok = assertDoesNotThrow(() -> svc.register(body));
+    assertTrue(tok.containsKey("access_token"));
+
+    List<UserRecord> users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    UserRecord mo = users.stream().filter(u -> "newmo@test.edu".equalsIgnoreCase(u.email)).findFirst().orElseThrow();
+    assertEquals("mo", mo.role);
+    assertEquals("MO-1001", mo.student_id);
+    assertTrue(mo.password_hash != null && !mo.password_hash.equals("Abcd1234"));
+    assertTrue(Passwords.verify("Abcd1234", mo.password_hash));
   }
 
   @Test

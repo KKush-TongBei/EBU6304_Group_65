@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [params] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [sessionHint, setSessionHint] = useState("");
@@ -100,15 +101,27 @@ export default function LoginPage() {
               <label htmlFor="login-password" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
                 密码
               </label>
-              <Input
-                id="login-password"
-                ref={passwordRef}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                aria-invalid={!!err && !password}
-              />
+              <div className="relative">
+                <Input
+                  id="login-password"
+                  ref={passwordRef}
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  placeholder="请输入密码"
+                  aria-invalid={!!err && !password}
+                  className="pr-16"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink-600 dark:text-slate-300 hover:text-accent"
+                >
+                  {showPassword ? "隐藏" : "显示"}
+                </button>
+              </div>
             </div>
             {err && (
               <p id="login-err" className="text-sm text-red-600 dark:text-red-400" role="alert">
