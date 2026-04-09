@@ -77,10 +77,11 @@ export const api = {
       password: string;
       display_name?: string;
       student_id?: string;
+      role: "TA" | "MO";
     }) =>
       request<{ access_token: string }>("/api/auth/register", {
         method: "POST",
-        json: { ...body, role: "ta" },
+        json: body,
       }),
     logout: () =>
       request<{ ok: boolean }>("/api/auth/logout", {
