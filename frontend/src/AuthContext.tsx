@@ -18,6 +18,7 @@ interface AuthState {
     password: string;
     display_name?: string;
     student_id?: string;
+    role: "TA" | "MO";
   }) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string;
     display_name?: string;
     student_id?: string;
+    role: "TA" | "MO";
   }) => {
     const { access_token } = await api.auth.register(p);
     setToken(access_token);
