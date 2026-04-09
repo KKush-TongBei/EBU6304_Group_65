@@ -179,25 +179,34 @@ public final class TaRecruitService {
       Counters c = readCountersUnsafe();
       String email = requireStr(body.get("email"), "email");
       String password = requireStr(body.get("password"), "password");
-      String role = optStr(body.get("role"));
-      if (role != null && !"ta".equalsIgnoreCase(role)) {
-        throw new ApiException(403, "Public registration is only allowed for TA accounts");
+      UserRole role;
+      try {
+        role = UserRole.fromString(requireStr(body.get("role"), "role"));
+      } catch (IllegalArgumentException ex) {
+        throw new ApiException(422, "role must be TA or MO");
+      }
+      if (role != UserRole.TA && role != UserRole.MO) {
+        throw new ApiException(422, "role must be TA or MO");
       }
       String studentId = optStr(body.get("student_id"));
       if (studentId == null || studentId.isBlank()) {
-        throw new ApiException(400, "TA accounts require student_id");
+        throw new ApiException(400, role == UserRole.TA ? "TA accounts require student_id" : "MO accounts require staff_id");
       }
       String dn = optStr(body.get("display_name"));
       int newId = c.userSeq;
       try {
-        userAccounts.persistNewTa(newId, email, password, dn, studentId.strip());
+        if (role == UserRole.TA) {
+          userAccounts.persistNewTa(newId, email, password, dn, studentId.strip());
+        } else {
+          userAccounts.persistNewStaff(newId, email, password, UserRole.MO, dn, studentId.strip());
+        }
       } catch (IllegalArgumentException ex) {
         throw mapUserServiceToApi(ex);
       }
       c.userSeq = newId + 1;
       String storedEmail = email.trim().toLowerCase(Locale.ROOT);
       logActivityUnsafe(logs, c, newId, "register", "user", newId,
-          Map.of("email", storedEmail, "role", "ta"));
+          Map.of("email", storedEmail, "role", role.value()));
       saveAll(null, null, null, null, null, logs, c);
       return tokenMap(newId);
     } catch (IOException e) {
