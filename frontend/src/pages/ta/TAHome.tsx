@@ -10,6 +10,7 @@ export default function TAHome() {
   const { toast } = useFeedback();
   const [notes, setNotes] = useState<Notification[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [since7, setSince7] = useState(false);
   const [dash, setDash] = useState<Record<string, unknown> | null>(null);
 
   const loadDash = useCallback(() => {
@@ -18,14 +19,14 @@ export default function TAHome() {
 
   const load = useCallback(() => {
     api.notifications
-      .list({ unread_only: unreadOnly })
+      .list({ unread_only: unreadOnly, since_days: since7 ? 7 : undefined })
       .then(setNotes)
       .catch(() => {
         setNotes([]);
         toast("通知加载失败", "error");
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- toast 引用省略以避免无意义重渲染
-  }, [unreadOnly]);
+  }, [unreadOnly, since7]);
 
   useEffect(() => {
     loadDash();
@@ -131,6 +132,9 @@ export default function TAHome() {
         <Button variant={unreadOnly ? "primary" : "secondary"} onClick={() => setUnreadOnly(true)}>
           仅未读
         </Button>
+        <Button variant={since7 ? "primary" : "secondary"} onClick={() => setSince7((v) => !v)}>
+          {since7 ? "最近 7 天（开）" : "最近 7 天"}
+        </Button>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -150,6 +154,11 @@ export default function TAHome() {
             <li>
               <Link className="text-accent font-medium hover:underline" to="/ta/applications">
                 查看申请状态与撤回待处理申请
+              </Link>
+            </li>
+            <li>
+              <Link className="text-accent font-medium hover:underline" to="/ta/notifications">
+                通知中心（筛选、全部标已读）
               </Link>
             </li>
           </ul>

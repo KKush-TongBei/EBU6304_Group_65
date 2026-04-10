@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { routerBasename } from "./appBase";
 import { AuthProvider } from "./AuthContext";
 import { FeedbackProvider } from "./feedback";
 import { ThemeProvider } from "./theme";
@@ -25,7 +26,7 @@ export default function App() {
     <ThemeProvider>
       <FeedbackProvider>
         <AuthProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={routerBasename()}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />

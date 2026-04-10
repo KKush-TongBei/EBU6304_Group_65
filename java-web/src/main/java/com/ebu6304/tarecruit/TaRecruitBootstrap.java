@@ -11,6 +11,13 @@ import java.nio.file.Path;
 
 @WebListener
 public final class TaRecruitBootstrap implements ServletContextListener {
+  /**
+   * 与 README 演示账号一致：仅在当前数据里尚无任何 {@code admin} 用户时由 {@link TaRecruitService#ensureSeedAdmin}
+   * 写入。生产环境请优先在数据中预置管理员，或同时设置 {@code TA_SEED_ADMIN_EMAIL} 与
+   * {@code TA_SEED_ADMIN_PASSWORD} 覆盖（勿只设其一）。
+   */
+  private static final String README_DEMO_ADMIN_EMAIL = "zyx1678162910@gmail.com";
+  private static final String README_DEMO_ADMIN_PASSWORD = "admin123456";
 
   @Override
   public void contextInitialized(ServletContextEvent sce) {
@@ -24,8 +31,10 @@ public final class TaRecruitBootstrap implements ServletContextListener {
       svc.initEmptyFiles();
       String seedEmail = System.getenv("TA_SEED_ADMIN_EMAIL");
       String seedPassword = System.getenv("TA_SEED_ADMIN_PASSWORD");
-      if (seedEmail != null && seedPassword != null) {
-        svc.ensureSeedAdmin(seedEmail, seedPassword);
+      if (seedEmail != null && !seedEmail.isBlank() && seedPassword != null && !seedPassword.isBlank()) {
+        svc.ensureSeedAdmin(seedEmail.trim(), seedPassword);
+      } else {
+        svc.ensureSeedAdmin(README_DEMO_ADMIN_EMAIL, README_DEMO_ADMIN_PASSWORD);
       }
       ctx.setAttribute(TaRecruitService.CTX_ATTR, svc);
     } catch (IOException e) {

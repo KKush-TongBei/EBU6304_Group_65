@@ -154,9 +154,11 @@ export default function TAJobs() {
                 排序
               </label>
               <Select id="job-sort" className="mt-1 w-full" value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="">默认</option>
+                <option value="">默认（最新发布）</option>
                 <option value="deadline">截止日</option>
                 <option value="created_at">发布时间</option>
+                <option value="assigned_hours">预估工时（低→高）</option>
+                <option value="quota">招聘名额（少→多）</option>
               </Select>
             </div>
             <Button type="submit">搜索</Button>

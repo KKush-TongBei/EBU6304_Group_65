@@ -40,7 +40,7 @@ Tie Wang 231226543 gitid:WANGNNNnnn
 
 ### 管理员登录（组内开发 / 演示）
 
-前端**公开注册**仅可创建 **TA**；管理员需在数据里已存在。组内约定使用下列**演示账号**登录后台（在项目根目录执行脚本时，数据目录一般为 `java-web/data/`）：
+前端**公开注册**可创建 **TA / MO**；**管理员**不能通过前端自注册。组内约定使用下列**演示账号**登录后台（数据目录一般为 `java-web/data/`）：
 
 | | |
 |---|---|
@@ -50,10 +50,11 @@ Tie Wang 231226543 gitid:WANGNNNnnn
 **说明：**
 
 - 仅用于**本地与课程演示**，勿用于公网或真实生产环境；提交作业 ZIP 时请按课程要求处理数据，勿泄露敏感信息。
-- 若你本地 **`java-web/data/users.json`** 里还没有该管理员：可向组长索取含该用户的 `users.json` 片段；或在**当前没有任何 admin 用户**时，启动后端前执行  
-  `export TA_SEED_ADMIN_EMAIL=zyx1678162910@gmail.com`  
-  `export TA_SEED_ADMIN_PASSWORD=admin123456`  
-  再运行 Tomcat / `./scripts/tomcat-run.sh`，系统会在首次启动时自动创建该管理员。
+- **首次启动**：若数据中尚无任何 `admin` 用户，后端在启动时会**自动创建**上表中的演示管理员（无需再手动 `export`）。若已存在其他 admin，则不会覆盖。
+- **自定义管理员种子**：在**当前没有任何 admin 用户**时，可同时设置  
+  `TA_SEED_ADMIN_EMAIL` 与 `TA_SEED_ADMIN_PASSWORD`  
+  再启动 Tomcat / `./scripts/tomcat-run.sh`，将用你提供的邮箱与密码创建管理员（请**同时设置两项**，勿只设其一）。
+- 也可向组长索取含该管理员的 `users.json` 片段，放入 `java-web/data/`。
 
 ### 1. 构建 WAR
 
