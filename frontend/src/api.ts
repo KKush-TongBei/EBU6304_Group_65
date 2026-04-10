@@ -1,3 +1,4 @@
+import { withAppBase } from "./appBase";
 import type {
   ActivityLog,
   Application,
@@ -26,6 +27,15 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+/** 与 {@link request} 一致：带 Token 的请求若 401 则清会话并跳转登录（用于裸 fetch 场景）。 */
+export function handleUnauthorizedRedirect(apiPath: string, status: number, hadBearerToken: boolean): void {
+  if (status !== 401 || !hadBearerToken) return;
+  if (apiPath.includes("/api/auth/login") || apiPath.includes("/api/auth/register")) return;
+  setToken(null);
+  sessionStorage.setItem("ta_session_expired", "1");
+  window.location.assign(withAppBase("/login?reason=session"));
+}
+
 async function request<T>(
   path: string,
   options: RequestInit & { json?: unknown } = {}
@@ -52,11 +62,7 @@ async function request<T>(
     } catch {
       /* ignore */
     }
-    if (res.status === 401 && token && !path.includes("/api/auth/login") && !path.includes("/api/auth/register")) {
-      setToken(null);
-      sessionStorage.setItem("ta_session_expired", "1");
-      window.location.assign("/login?reason=session");
-    }
+    handleUnauthorizedRedirect(path, res.status, Boolean(token));
     throw new Error(detail);
   }
   if (res.status === 204) return undefined as T;
@@ -140,6 +146,7 @@ export const api = {
         } catch {
           /* ignore */
         }
+        handleUnauthorizedRedirect("/api/ta/cv", res.status, Boolean(token));
         throw new Error(detail);
       }
       return res.json() as Promise<{ file_id: number; stored_name: string }>;
@@ -272,6 +279,7 @@ export async function downloadWithAuth(url: string, filename: string): Promise<v
     } catch {
       detail = res.statusText || detail;
     }
+    handleUnauthorizedRedirect(url, res.status, Boolean(token));
     throw new Error(detail);
   }
   const blob = await res.blob();

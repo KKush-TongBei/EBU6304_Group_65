@@ -488,16 +488,7 @@ public final class TaRecruitService {
     rw.readLock().lock();
     try {
       UserRecord u = requireRole(requireUserUnsafe(readUsersUnsafe(), userId), "ta");
-      Map<String, Object> m = new LinkedHashMap<>(userOut(u));
-      List<CvFileRecord> files = readCvFilesUnsafe();
-      files.stream()
-          .filter(f -> f.user_id == userId)
-          .max(Comparator.comparing(f -> f.created_at != null ? f.created_at : Instant.EPOCH))
-          .ifPresent(f -> {
-            m.put("cv_file_id", f.id);
-            m.put("cv_original_name", f.original_name);
-          });
-      return m;
+      return taProfileOut(u);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -535,12 +526,26 @@ public final class TaRecruitService {
       patchProfileStructured(user, body);
       logActivityUnsafe(logs, c, user.id, "profile_updated", "user", user.id, Map.of());
       saveAll(users, null, null, null, null, logs, c);
-      return userOut(user);
+      return taProfileOut(user);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
       rw.writeLock().unlock();
     }
+  }
+
+  /** TA 资料 API 统一返回：含最新简历文件元数据（与 {@link #taGetProfile} 一致）。 */
+  private Map<String, Object> taProfileOut(UserRecord u) throws IOException {
+    Map<String, Object> m = new LinkedHashMap<>(userOut(u));
+    List<CvFileRecord> files = readCvFilesUnsafe();
+    files.stream()
+        .filter(f -> f.user_id == u.id)
+        .max(Comparator.comparing(f -> f.created_at != null ? f.created_at : Instant.EPOCH))
+        .ifPresent(f -> {
+          m.put("cv_file_id", f.id);
+          m.put("cv_original_name", f.original_name);
+        });
+    return m;
   }
 
   public List<Map<String, Object>> taApplications(int userId) {
