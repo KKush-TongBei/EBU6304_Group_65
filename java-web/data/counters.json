@@ -1,10 +1,10 @@
 {
   "userSeq" : 4,
-  "jobSeq" : 4,
-  "applicationSeq" : 1,
-  "assignmentSeq" : 1,
-  "notificationSeq" : 1,
-  "activityLogSeq" : 16,
-  "evaluationSeq" : 1,
+  "jobSeq" : 6,
+  "applicationSeq" : 3,
+  "assignmentSeq" : 2,
+  "notificationSeq" : 6,
+  "activityLogSeq" : 33,
+  "evaluationSeq" : 2,
   "cvFileSeq" : 2
 }
