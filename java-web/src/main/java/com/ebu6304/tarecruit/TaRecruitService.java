@@ -192,21 +192,25 @@ public final class TaRecruitService {
       if (studentId == null || studentId.isBlank()) {
         throw new ApiException(400, role == UserRole.TA ? "TA accounts require student_id" : "MO accounts require staff_id");
       }
+      String sid = studentId.strip();
       String dn = optStr(body.get("display_name"));
       int newId = c.userSeq;
       try {
         if (role == UserRole.TA) {
-          userAccounts.persistNewTa(newId, email, password, dn, studentId.strip());
+          userAccounts.persistNewTa(newId, email, password, dn, sid);
         } else {
-          userAccounts.persistNewStaff(newId, email, password, UserRole.MO, dn, studentId.strip());
+          userAccounts.persistNewStaff(newId, email, password, UserRole.MO, dn, sid);
         }
       } catch (IllegalArgumentException ex) {
         throw mapUserServiceToApi(ex);
       }
       c.userSeq = newId + 1;
       String storedEmail = email.trim().toLowerCase(Locale.ROOT);
-      logActivityUnsafe(logs, c, newId, "register", "user", newId,
-          Map.of("email", storedEmail, "role", role.value()));
+      Map<String, Object> regPayload = new LinkedHashMap<>();
+      regPayload.put("email", storedEmail);
+      regPayload.put("role", role.value());
+      regPayload.put("student_id", sid);
+      logActivityUnsafe(logs, c, newId, "register", "user", newId, regPayload);
       saveAll(null, null, null, null, null, logs, c);
       return tokenMap(newId);
     } catch (IOException e) {
@@ -236,6 +240,9 @@ public final class TaRecruitService {
       }
       String dn = optStr(body.get("display_name"));
       String studentId = optStr(body.get("student_id"));
+      if (role == UserRole.MO && (studentId == null || studentId.isBlank())) {
+        throw new ApiException(400, "MO accounts require staff_id");
+      }
       int newId = c.userSeq;
       try {
         userAccounts.persistNewStaff(newId, email, password, role, dn, studentId);
@@ -244,8 +251,17 @@ public final class TaRecruitService {
       }
       c.userSeq = newId + 1;
       String storedEmail = email.trim().toLowerCase(Locale.ROOT);
-      logActivityUnsafe(logs, c, adminId, "user_created_by_admin", "user", newId,
-          Map.of("email", storedEmail, "role", role.value()));
+      if (role == UserRole.MO) {
+        Map<String, Object> moRegPayload = new LinkedHashMap<>();
+        moRegPayload.put("email", storedEmail);
+        moRegPayload.put("role", role.value());
+        moRegPayload.put("student_id", studentId.strip());
+        moRegPayload.put("created_by_admin_id", adminId);
+        logActivityUnsafe(logs, c, newId, "register", "user", newId, moRegPayload);
+      } else {
+        logActivityUnsafe(logs, c, adminId, "user_created_by_admin", "user", newId,
+            Map.of("email", storedEmail, "role", role.value()));
+      }
       saveAll(null, null, null, null, null, logs, c);
       UserRecord fresh = requireUserUnsafe(readUsersUnsafe(), newId);
       return userOut(fresh);

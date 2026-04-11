@@ -4,6 +4,7 @@ import com.ebu6304.tarecruit.api.ApiException;
 import com.ebu6304.tarecruit.auth.JwtHelper;
 import com.ebu6304.tarecruit.auth.Passwords;
 import com.ebu6304.tarecruit.domain.Counters;
+import com.ebu6304.tarecruit.domain.ActivityLogRecord;
 import com.ebu6304.tarecruit.domain.ApplicationRecord;
 import com.ebu6304.tarecruit.domain.JobRecord;
 import com.ebu6304.tarecruit.domain.UserRecord;
@@ -137,6 +138,45 @@ class TaRecruitServiceCoreTest {
     assertEquals("MO-1001", mo.student_id);
     assertTrue(mo.password_hash != null && !mo.password_hash.equals("Abcd1234"));
     assertTrue(Passwords.verify("Abcd1234", mo.password_hash));
+  }
+
+  @Test
+  void adminCreateMoWritesRegisterLogWithStaffAndAdminId() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "adminmade_mo@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("display_name", "Admin Made MO");
+    body.put("role", "mo");
+    body.put("student_id", "MO-ADMIN-1");
+    assertDoesNotThrow(() -> svc.adminCreateUser(1, body));
+
+    List<ActivityLogRecord> logs = AtomicJsonFile.readList(
+        dataDir.resolve("activity_logs.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<ActivityLogRecord>>() {},
+        new ArrayList<>());
+    ActivityLogRecord reg = logs.stream()
+        .filter(l -> "register".equals(l.action)
+            && l.payload != null
+            && l.payload.get("created_by_admin_id") != null)
+        .reduce((a, b) -> b)
+        .orElseThrow();
+    assertEquals("user", reg.entity_type);
+    assertEquals(4, reg.entity_id.intValue());
+    assertEquals(4, reg.actor_user_id.intValue());
+    assertEquals("adminmade_mo@test.edu", reg.payload.get("email"));
+    assertEquals("mo", reg.payload.get("role"));
+    assertEquals("MO-ADMIN-1", reg.payload.get("student_id"));
+    assertEquals(1, ((Number) reg.payload.get("created_by_admin_id")).intValue());
+  }
+
+  @Test
+  void adminCreateMoRejectsMissingStaffId() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "nomo@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("role", "mo");
+    ApiException ex = assertThrows(ApiException.class, () -> svc.adminCreateUser(1, body));
+    assertEquals(400, ex.status);
   }
 
   @Test
