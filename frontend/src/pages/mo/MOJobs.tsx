@@ -68,7 +68,7 @@ export default function MOJobs() {
                       ) : null}
                     </div>
                     <p className="text-xs text-ink-500 dark:text-slate-400 mt-1">
-                      截止 {j.deadline || "—"} · {j.assigned_hours}h/人 · 名额 {j.accepted_count ?? 0}/{j.quota ?? 1}
+                      截止 {j.deadline || "—"} · {j.assigned_hours} 工时/周 · 名额 {j.accepted_count ?? 0}/{j.quota ?? 1}
                     </p>
                   </div>
                   <div className="shrink-0 self-center">

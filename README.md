@@ -13,6 +13,7 @@ Tie Wang 231226543 gitid:WANGNNNnnn
 ## 技术栈
 
 - **课程合规主版本（提交推荐）**：Java 17、**Jakarta Servlet 6**（Tomcat 10+）、Jackson、JJWT、BCrypt；数据为 **`java-web/data/` 下多文件 JSON**（`users.json`、`jobs.json`、`applications.json`、`notifications.json`、`assignments.json`、`activity_logs.json`、`counters.json`），**不使用数据库**；写入采用临时文件校验后替换，并由读写锁保护。
+- **登录与输入**：登录失败 **连续 3 次**错误密码即锁定；锁定时长随累计锁定次数递增（有上限 24 小时），成功登录后清零；邮箱整条 **≤50** 字符、**姓名/显示名 ≤50**、**学号或工号 ≤25**；其余主要文本字段在后端由 `InputValidation` 做长度与格式校验（写接口返回 **422** 时见错误信息）。
 - **前端**：Vite、React 18、TypeScript、Tailwind CSS、React Router（生产环境可构建进 WAR，与 `/api/*` 同源）。
 
 ## 环境要求

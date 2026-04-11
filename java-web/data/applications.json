@@ -10,8 +10,24 @@
   "id" : 2,
   "job_id" : 5,
   "ta_user_id" : 2,
-  "status" : "pending",
+  "status" : "accepted",
   "created_at" : "2026-04-11T07:01:20.309761Z",
+  "decided_at" : "2026-04-11T14:21:09.704044Z",
+  "shortlist_tag" : ""
+}, {
+  "id" : 3,
+  "job_id" : 6,
+  "ta_user_id" : 2,
+  "status" : "accepted",
+  "created_at" : "2026-04-11T14:20:07.001596Z",
+  "decided_at" : "2026-04-11T14:22:11.648273Z",
+  "shortlist_tag" : ""
+}, {
+  "id" : 4,
+  "job_id" : 7,
+  "ta_user_id" : 2,
+  "status" : "withdrawn",
+  "created_at" : "2026-04-11T16:17:22.829610Z",
   "decided_at" : null,
   "shortlist_tag" : ""
 } ]

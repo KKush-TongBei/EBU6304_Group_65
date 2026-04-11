@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";
+import { notificationCategoryLabel, notificationRiskStyle } from "../../notificationLabels";
 import { useFeedback } from "../../feedback";
 import type { Notification } from "../../types";
 import AppShell from "../../AppShell";
@@ -66,8 +67,15 @@ export default function TAHome() {
   };
 
   const notifLink = (n: Notification) => {
-    if (n.link_application_id != null) return "/ta/applications";
-    if (n.link_job_id != null) return "/ta/jobs";
+    if (n.category === "workload_alert" && n.link_job_id != null) {
+      return "/ta/jobs";
+    }
+    if (n.link_application_id != null) {
+      return "/ta/applications";
+    }
+    if (n.link_job_id != null) {
+      return "/ta/jobs";
+    }
     return null;
   };
 
@@ -192,10 +200,13 @@ export default function TAHome() {
             <ul className="mt-4 space-y-3">
               {notes.slice(0, 8).map((n) => {
                 const href = notifLink(n);
+                const risk = notificationRiskStyle(n.category);
                 return (
                   <li
                     key={n.id}
-                    className="text-sm border-b border-slate-100 dark:border-slate-800 pb-2 flex flex-wrap items-start justify-between gap-2"
+                    className={`text-sm border-b border-slate-100 dark:border-slate-800 pb-2 flex flex-wrap items-start justify-between gap-2 ${
+                      risk ? "rounded-lg bg-amber-50/80 dark:bg-amber-950/30 px-2 py-2 -mx-1" : ""
+                    }`}
                   >
                     <div className="min-w-0 flex-1">
                       {href ? (
@@ -217,7 +228,9 @@ export default function TAHome() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
                             {n.category ? (
-                              <span className="text-xs text-ink-500 dark:text-slate-400">[{n.category}]</span>
+                              <span className="text-xs text-ink-500 dark:text-slate-400">
+                                [{notificationCategoryLabel(n.category)}]
+                              </span>
                             ) : null}
                           </div>
                           <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
@@ -239,7 +252,9 @@ export default function TAHome() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
                             {n.category ? (
-                              <span className="text-xs text-ink-500 dark:text-slate-400">[{n.category}]</span>
+                              <span className="text-xs text-ink-500 dark:text-slate-400">
+                                [{notificationCategoryLabel(n.category)}]
+                              </span>
                             ) : null}
                           </div>
                           <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
