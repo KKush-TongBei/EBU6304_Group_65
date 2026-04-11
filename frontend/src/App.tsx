@@ -82,6 +82,14 @@ export default function App() {
                 }
               />
               <Route
+                path="/mo/jobs/:id"
+                element={
+                  <RequireRole role="mo">
+                    <MOJobDetail />
+                  </RequireRole>
+                }
+              />
+              <Route
                 path="/mo/jobs"
                 element={
                   <RequireRole role="mo">
@@ -94,14 +102,6 @@ export default function App() {
                 element={
                   <RequireRole role="mo">
                     <MOPost />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/mo/jobs/:id"
-                element={
-                  <RequireRole role="mo">
-                    <MOJobDetail />
                   </RequireRole>
                 }
               />
