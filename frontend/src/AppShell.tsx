@@ -47,6 +47,7 @@ export default function AppShell({
             { to: "/mo/notifications", label: "通知", badge: unreadN },
             { to: "/mo/jobs", label: "我的岗位" },
             { to: "/mo/post", label: "发布岗位" },
+            { to: "/mo/account", label: "账号与安全" },
           ]
         : [
             { to: "/admin", label: "总览" },

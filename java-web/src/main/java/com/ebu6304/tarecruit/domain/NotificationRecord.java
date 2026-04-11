@@ -13,7 +13,7 @@ public final class NotificationRecord {
   public Integer application_id;
   public boolean read;
   public Instant created_at;
-  /** decision | deadline | profile | job_closed | job | workload_alert | system */
+  /** decision | deadline | profile | job_closed | job | application | workload_alert | system */
   public String category = "system";
   public Integer link_job_id;
   public Integer link_application_id;
