@@ -6,9 +6,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @WebServlet(urlPatterns = {"/api/notifications", "/api/notifications/*"})
 public final class NotificationsServlet extends JsonServlet {
+  private static final Pattern NOTIF_ID = Pattern.compile("^/(\\d+)$");
   private static Integer parseSinceDays(String p) {
     if (p == null || p.isBlank()) {
       return null;
@@ -48,6 +51,22 @@ public final class NotificationsServlet extends JsonServlet {
       String pi = req.getPathInfo();
       if ("/mark-read".equals(pi)) {
         writeJson(resp, 200, s.notificationsMarkRead(userId(req), readMap(req)));
+        return;
+      }
+      resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+    } catch (Exception e) {
+      handleError(resp, e);
+    }
+  }
+
+  @Override
+  protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    try {
+      TaRecruitService s = svc(req);
+      String pi = req.getPathInfo();
+      Matcher m = NOTIF_ID.matcher(pi != null ? pi : "");
+      if (m.matches()) {
+        writeJson(resp, 200, s.notificationsDelete(userId(req), Integer.parseInt(m.group(1))));
         return;
       }
       resp.sendError(HttpServletResponse.SC_NOT_FOUND);

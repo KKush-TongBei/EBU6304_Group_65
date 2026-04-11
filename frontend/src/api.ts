@@ -172,6 +172,8 @@ export const api = {
         method: "POST",
         json: { notification_ids: ids ?? null },
       }),
+    delete: (id: number) =>
+      request<{ ok: boolean }>(`/api/notifications/${id}`, { method: "DELETE" }),
   },
   mo: {
     dashboard: () => request<Record<string, unknown>>("/api/mo/dashboard"),
