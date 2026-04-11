@@ -48,6 +48,8 @@ export interface Job {
   updated_at: string;
   quota?: number;
   accepted_count?: number;
+  /** MO：待处理（pending）申请数量，用于列表角标 */
+  pending_applications_count?: number;
   job_type?: string;
   term?: string;
   schedule_text?: string;

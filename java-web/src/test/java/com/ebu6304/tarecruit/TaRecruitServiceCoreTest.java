@@ -185,6 +185,95 @@ class TaRecruitServiceCoreTest {
   }
 
   @Test
+  void publicRegisterCreatesAdminNotification() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "regta@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("student_id", "2025999");
+    body.put("role", "TA");
+    svc.register(body);
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertEquals(1, notifs.size());
+    assertEquals(1, notifs.get(0).user_id);
+    assertFalse(notifs.get(0).read);
+    assertTrue(notifs.get(0).title.contains("新用户注册"));
+    assertTrue(notifs.get(0).body.contains("regta@test.edu"));
+  }
+
+  @Test
+  void adminCreateUserDoesNotCreateAdminRegistrationNotification() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "adminmade_only@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("display_name", "Only Admin");
+    body.put("role", "mo");
+    body.put("student_id", "MO-X");
+    svc.adminCreateUser(1, body);
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(notifs.isEmpty());
+  }
+
+  @Test
+  void taDeleteOwnAccountNotifiesAdmin() throws Exception {
+    assertDoesNotThrow(() -> svc.deleteOwnAccount(3, Map.of("password", "Ta123456")));
+
+    List<UserRecord> users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    assertTrue(users.stream().noneMatch(u -> u.id == 3));
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    NotificationRecord toAdmin = notifs.stream().filter(n -> n.user_id == 1).findFirst().orElseThrow();
+    assertTrue(toAdmin.title.contains("注销"));
+    assertTrue(toAdmin.body.contains("ta@test.edu"));
+  }
+
+  @Test
+  void taDeleteOwnAccountWrongPassword() {
+    ApiException ex = assertThrows(ApiException.class, () -> svc.deleteOwnAccount(3, Map.of("password", "nope")));
+    assertEquals(400, ex.status);
+  }
+
+  @Test
+  void adminCannotSelfDeleteAccount() {
+    ApiException ex = assertThrows(ApiException.class, () -> svc.deleteOwnAccount(1, Map.of("password", "Admin12345")));
+    assertEquals(403, ex.status);
+  }
+
+  @Test
+  void moWithCreatedJobCannotDeleteAccount() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "Owned";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 1;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    ApiException ex = assertThrows(ApiException.class, () -> svc.deleteOwnAccount(2, Map.of("password", "Mo123456")));
+    assertEquals(400, ex.status);
+  }
+
+  @Test
   void applyRejectedAfterDeadline() throws Exception {
     List<JobRecord> jobs = new ArrayList<>();
     JobRecord j = new JobRecord();
@@ -338,6 +427,78 @@ class TaRecruitServiceCoreTest {
 
     ApiException ex = assertThrows(ApiException.class, () -> svc.moJobApplicants(2, 10, null, null));
     assertEquals(403, ex.status);
+  }
+
+  @Test
+  void applyJobNotifiesMoOwner() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "NotifyMo";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    assertDoesNotThrow(() -> svc.applyJob(3, 1));
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(notifs.stream().anyMatch(
+        n -> n.user_id == 2
+            && "application".equals(n.category)
+            && n.link_job_id != null
+            && n.link_job_id == 1
+            && n.title.contains("新申请")));
+  }
+
+  @Test
+  void moJobsIncludesPendingApplicationsCount() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "WithPending";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 3;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    List<ApplicationRecord> apps = new ArrayList<>();
+    ApplicationRecord a1 = new ApplicationRecord();
+    a1.id = 1;
+    a1.job_id = 1;
+    a1.ta_user_id = 3;
+    a1.status = "pending";
+    a1.created_at = Instant.now();
+    apps.add(a1);
+    ApplicationRecord a2 = new ApplicationRecord();
+    a2.id = 2;
+    a2.job_id = 1;
+    a2.ta_user_id = 3;
+    a2.status = "interviewing";
+    a2.created_at = Instant.now();
+    apps.add(a2);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("applications.json"), apps);
+
+    Map<String, Object> row = svc.moJobs(2, "").stream()
+        .filter(m -> m.get("id").equals(1))
+        .findFirst()
+        .orElseThrow();
+    assertEquals(1, ((Number) row.get("pending_applications_count")).intValue());
   }
 
   @Test

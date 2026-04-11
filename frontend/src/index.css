@@ -11,3 +11,9 @@ body {
   background-color: rgb(15 23 42);
   color: rgb(241 245 249);
 }
+
+/* Avoid inherited light-on-light when textarea sits in tinted dark rows (e.g. MO 评分表). */
+.dark textarea {
+  color: rgb(241 245 249);
+  background-color: rgb(15 23 42);
+}

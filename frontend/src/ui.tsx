@@ -94,10 +94,10 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   }
 );
 
-export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className = "", ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={`${inputCls} min-h-[100px]`}
+      className={`${inputCls} min-h-[100px] [color-scheme:light] dark:[color-scheme:dark] ${className}`}
       {...props}
     />
   );

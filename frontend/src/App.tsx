@@ -11,6 +11,7 @@ import AdminHome from "./pages/admin/AdminHome";
 import AdminLogs from "./pages/admin/AdminLogs";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminUsers from "./pages/admin/AdminUsers";
+import MOAccount from "./pages/mo/MOAccount";
 import MOHome from "./pages/mo/MOHome";
 import MOJobDetail from "./pages/mo/MOJobDetail";
 import MOJobs from "./pages/mo/MOJobs";
@@ -102,6 +103,14 @@ export default function App() {
                 element={
                   <RequireRole role="mo">
                     <MOPost />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/mo/account"
+                element={
+                  <RequireRole role="mo">
+                    <MOAccount />
                   </RequireRole>
                 }
               />

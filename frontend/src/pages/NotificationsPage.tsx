@@ -101,6 +101,17 @@ export default function NotificationsPage({ role }: { role: UserRole }) {
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
+                      <div className="mb-2">
+                        {n.read ? (
+                          <span className="inline-block rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+                            已读
+                          </span>
+                        ) : (
+                          <span className="inline-block rounded-md bg-amber-400 px-2.5 py-1 text-xs font-semibold text-amber-950 shadow-sm dark:bg-amber-500 dark:text-amber-950">
+                            未读
+                          </span>
+                        )}
+                      </div>
                       {href ? (
                         <Link
                           to={href}
