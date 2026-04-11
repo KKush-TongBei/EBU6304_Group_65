@@ -94,17 +94,25 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   }
 );
 
-export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className = "", ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={`${inputCls} min-h-[100px]`}
+      className={`${inputCls} min-h-[100px] [color-scheme:light] dark:[color-scheme:dark] ${className}`}
       {...props}
     />
   );
 }
 
-export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={inputCls} {...props} />;
+export function Select({
+  className = "",
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      className={`${inputCls} [color-scheme:light] dark:[color-scheme:dark] ${className}`}
+      {...props}
+    />
+  );
 }
 
 export function Badge({
@@ -131,22 +139,22 @@ export function Badge({
   );
 }
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, pill = true }: { status: string; pill?: boolean }) {
   const s = status.toLowerCase();
-  if (s === "pending") return <Badge tone="warn" pill>已申请</Badge>;
-  if (s === "interviewing") return <Badge tone="info" pill>面试中</Badge>;
-  if (s === "accepted") return <Badge tone="ok" pill>已录用</Badge>;
-  if (s === "rejected") return <Badge tone="bad" pill>已拒绝</Badge>;
-  if (s === "withdrawn") return <Badge tone="neutral" pill>已撤回</Badge>;
-  if (s === "open") return <Badge tone="ok" pill>开放</Badge>;
-  if (s === "draft") return <Badge tone="neutral" pill>草稿</Badge>;
-  if (s === "screening") return <Badge tone="warn" pill>筛选中</Badge>;
-  if (s === "interview") return <Badge tone="warn" pill>候选中</Badge>;
-  if (s === "shortlist") return <Badge tone="warn" pill>短名单</Badge>;
-  if (s === "filled") return <Badge tone="ok" pill>已招满</Badge>;
-  if (s === "closed") return <Badge tone="neutral" pill>已关闭</Badge>;
-  if (s === "cancelled") return <Badge tone="bad" pill>已取消</Badge>;
-  return <Badge pill>{status}</Badge>;
+  if (s === "pending") return <Badge tone="warn" pill={pill}>已申请</Badge>;
+  if (s === "interviewing") return <Badge tone="info" pill={pill}>面试中</Badge>;
+  if (s === "accepted") return <Badge tone="ok" pill={pill}>已录用</Badge>;
+  if (s === "rejected") return <Badge tone="bad" pill={pill}>已拒绝</Badge>;
+  if (s === "withdrawn") return <Badge tone="neutral" pill={pill}>已撤回</Badge>;
+  if (s === "open") return <Badge tone="ok" pill={pill}>开放</Badge>;
+  if (s === "draft") return <Badge tone="neutral" pill={pill}>草稿</Badge>;
+  if (s === "screening") return <Badge tone="warn" pill={pill}>筛选中</Badge>;
+  if (s === "interview") return <Badge tone="warn" pill={pill}>候选中</Badge>;
+  if (s === "shortlist") return <Badge tone="warn" pill={pill}>短名单</Badge>;
+  if (s === "filled") return <Badge tone="ok" pill={pill}>已招满</Badge>;
+  if (s === "closed") return <Badge tone="neutral" pill={pill}>已关闭</Badge>;
+  if (s === "cancelled") return <Badge tone="bad" pill={pill}>已取消</Badge>;
+  return <Badge pill={pill}>{status}</Badge>;
 }
 
 export function Spinner({ className = "" }: { className?: string }) {

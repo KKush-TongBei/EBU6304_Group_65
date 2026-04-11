@@ -1,0 +1,56 @@
+[ {
+  "id" : 1,
+  "user_id" : 2,
+  "title" : "新岗位开放申请",
+  "body" : "模块「Lab TA」已发布，可前往浏览岗位并申请。",
+  "application_id" : null,
+  "read" : true,
+  "created_at" : "2026-04-11T06:46:34.322160Z",
+  "category" : "job",
+  "link_job_id" : 4,
+  "link_application_id" : null
+}, {
+  "id" : 2,
+  "user_id" : 2,
+  "title" : "Application moved to interview",
+  "body" : "Your application for \"Lab TA\" moved to interviewing.",
+  "application_id" : 1,
+  "read" : true,
+  "created_at" : "2026-04-11T06:49:18.535527Z",
+  "category" : "decision",
+  "link_job_id" : 4,
+  "link_application_id" : 1
+}, {
+  "id" : 3,
+  "user_id" : 2,
+  "title" : "Application accepted",
+  "body" : "Your application for \"Lab TA\" was accepted.",
+  "application_id" : 1,
+  "read" : true,
+  "created_at" : "2026-04-11T06:49:33.531373Z",
+  "category" : "decision",
+  "link_job_id" : 4,
+  "link_application_id" : 1
+}, {
+  "id" : 4,
+  "user_id" : 2,
+  "title" : "新岗位开放申请",
+  "body" : "模块「Exam Marker」已发布，可前往浏览岗位并申请。",
+  "application_id" : null,
+  "read" : true,
+  "created_at" : "2026-04-11T07:00:22.793378Z",
+  "category" : "job",
+  "link_job_id" : 5,
+  "link_application_id" : null
+}, {
+  "id" : 5,
+  "user_id" : 3,
+  "title" : "新申请",
+  "body" : "TB 申请了岗位「Exam Marker」，可前往该岗位处理。",
+  "application_id" : 2,
+  "read" : false,
+  "created_at" : "2026-04-11T07:01:20.311053Z",
+  "category" : "application",
+  "link_job_id" : 5,
+  "link_application_id" : 2
+} ]

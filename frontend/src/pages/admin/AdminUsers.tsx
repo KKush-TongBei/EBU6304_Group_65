@@ -12,10 +12,15 @@ export default function AdminUsers() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Extract<UserRole, "mo" | "admin">>("mo");
   const [displayName, setDisplayName] = useState("");
+  const [staffId, setStaffId] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (role === "mo" && !staffId.trim()) {
+      toast("MO 账号需要填写职工号", "error");
+      return;
+    }
     setBusy(true);
     try {
       await api.admin.createUser({
@@ -23,11 +28,13 @@ export default function AdminUsers() {
         password,
         role,
         display_name: displayName || undefined,
+        student_id: role === "mo" ? staffId.trim() : undefined,
       });
       toast("用户已创建", "success");
       setEmail("");
       setPassword("");
       setDisplayName("");
+      setStaffId("");
     } catch (e: unknown) {
       toast(e instanceof Error ? e.message : "创建失败", "error");
     } finally {
@@ -45,22 +52,41 @@ export default function AdminUsers() {
       <Card className="p-6 max-w-lg">
         <p className="text-sm text-ink-600 dark:text-slate-300 mb-4">
           创建 MO 或 Admin 账号。密码需至少 8 位且同时包含字母与数字。
+          {role === "mo" ? " MO 需填写职工号，与公开注册一致。" : null}
         </p>
         <form onSubmit={submit} className="space-y-3">
           <Select value={role} onChange={(e) => setRole(e.target.value as "mo" | "admin")} aria-label="角色">
             <option value="mo">课程负责人 (MO)</option>
             <option value="admin">管理员 (Admin)</option>
           </Select>
-          <Input placeholder="邮箱" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input
-            type="password"
-            placeholder="密码"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="new-password"
-          />
-          <Input placeholder="显示名称" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          {role === "mo" ? (
+            <>
+              <Input placeholder="姓名" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              <Input placeholder="职工号" value={staffId} onChange={(e) => setStaffId(e.target.value)} required />
+              <Input placeholder="邮箱" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input
+                type="password"
+                placeholder="密码"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+            </>
+          ) : (
+            <>
+              <Input placeholder="姓名" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              <Input placeholder="邮箱" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input
+                type="password"
+                placeholder="密码"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+            </>
+          )}
           <Button type="submit" disabled={busy}>
             {busy ? "创建中…" : "创建用户"}
           </Button>

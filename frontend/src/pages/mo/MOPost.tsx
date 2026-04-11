@@ -165,16 +165,16 @@ export default function MOPost() {
               <label htmlFor="post-type" className="text-xs font-semibold text-ink-700 dark:text-slate-300">
                 岗位类型
               </label>
-              <select
+              <Select
                 id="post-type"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+                className="mt-1"
                 value={job_type}
                 onChange={(e) => setJobType(e.target.value)}
               >
                 <option value="course_ta">课程 TA</option>
                 <option value="invigilation">监考</option>
                 <option value="event_support">活动支持</option>
-              </select>
+              </Select>
             </div>
           </div>
           <div>

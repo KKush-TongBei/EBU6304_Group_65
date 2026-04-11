@@ -1,4 +1,5 @@
 import { Component, ReactNode } from "react";
+import { withAppBase } from "../appBase";
 
 interface Props {
   children: ReactNode;
@@ -26,7 +27,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   handleReset = () => {
     this.setState({ hasError: false, error: undefined });
-    window.location.href = "/";
+    window.location.href = withAppBase("/");
   };
 
   render() {

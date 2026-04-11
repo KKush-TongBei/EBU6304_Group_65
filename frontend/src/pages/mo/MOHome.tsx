@@ -60,9 +60,12 @@ export default function MOHome() {
         </Card>
       ) : null}
       {dash ? (
-        <div className="mb-8">
+        <div className="mb-8 flex flex-wrap gap-4 items-center">
           <Link to="/mo/post" className="text-accent font-semibold text-sm hover:underline">
             发布新岗位 →
+          </Link>
+          <Link to="/mo/notifications" className="text-accent font-semibold text-sm hover:underline">
+            通知中心 →
           </Link>
         </div>
       ) : null}
@@ -80,6 +83,9 @@ export default function MOHome() {
             <p className="text-xs text-ink-500 dark:text-slate-400">快捷操作</p>
             <Link to="/mo/post" className="text-accent font-semibold text-sm mt-2 inline-block hover:underline">
               发布新岗位 →
+            </Link>
+            <Link to="/mo/notifications" className="text-accent font-semibold text-sm mt-2 block hover:underline">
+              通知中心 →
             </Link>
           </Card>
         </div>

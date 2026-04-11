@@ -3,9 +3,14 @@ package com.ebu6304.tarecruit;
 import com.ebu6304.tarecruit.api.ApiException;
 import com.ebu6304.tarecruit.auth.JwtHelper;
 import com.ebu6304.tarecruit.auth.Passwords;
-import com.ebu6304.tarecruit.domain.Counters;
+import com.ebu6304.tarecruit.domain.ActivityLogRecord;
+import com.ebu6304.tarecruit.domain.ApplicationEvaluationRecord;
 import com.ebu6304.tarecruit.domain.ApplicationRecord;
+import com.ebu6304.tarecruit.domain.AssignmentRecord;
+import com.ebu6304.tarecruit.domain.Counters;
+import com.ebu6304.tarecruit.domain.JobFavoriteRecord;
 import com.ebu6304.tarecruit.domain.JobRecord;
+import com.ebu6304.tarecruit.domain.NotificationRecord;
 import com.ebu6304.tarecruit.domain.UserRecord;
 import com.ebu6304.tarecruit.store.AtomicJsonFile;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +26,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -140,6 +146,182 @@ class TaRecruitServiceCoreTest {
   }
 
   @Test
+  void adminCreateMoWritesRegisterLogWithStaffAndAdminId() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "adminmade_mo@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("display_name", "Admin Made MO");
+    body.put("role", "mo");
+    body.put("student_id", "MO-ADMIN-1");
+    assertDoesNotThrow(() -> svc.adminCreateUser(1, body));
+
+    List<ActivityLogRecord> logs = AtomicJsonFile.readList(
+        dataDir.resolve("activity_logs.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<ActivityLogRecord>>() {},
+        new ArrayList<>());
+    ActivityLogRecord reg = logs.stream()
+        .filter(l -> "register".equals(l.action)
+            && l.payload != null
+            && l.payload.get("created_by_admin_id") != null)
+        .reduce((a, b) -> b)
+        .orElseThrow();
+    assertEquals("user", reg.entity_type);
+    assertEquals(4, reg.entity_id.intValue());
+    assertEquals(4, reg.actor_user_id.intValue());
+    assertEquals("adminmade_mo@test.edu", reg.payload.get("email"));
+    assertEquals("mo", reg.payload.get("role"));
+    assertEquals("MO-ADMIN-1", reg.payload.get("student_id"));
+    assertEquals(1, ((Number) reg.payload.get("created_by_admin_id")).intValue());
+  }
+
+  @Test
+  void adminCreateMoRejectsMissingStaffId() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "nomo@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("role", "mo");
+    ApiException ex = assertThrows(ApiException.class, () -> svc.adminCreateUser(1, body));
+    assertEquals(400, ex.status);
+  }
+
+  @Test
+  void publicRegisterCreatesAdminNotification() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "regta@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("student_id", "2025999");
+    body.put("role", "TA");
+    svc.register(body);
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertEquals(1, notifs.size());
+    assertEquals(1, notifs.get(0).user_id);
+    assertFalse(notifs.get(0).read);
+    assertTrue(notifs.get(0).title.contains("新用户注册"));
+    assertTrue(notifs.get(0).body.contains("regta@test.edu"));
+  }
+
+  @Test
+  void adminCreateUserDoesNotCreateAdminRegistrationNotification() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "adminmade_only@test.edu");
+    body.put("password", "Abcd1234");
+    body.put("display_name", "Only Admin");
+    body.put("role", "mo");
+    body.put("student_id", "MO-X");
+    svc.adminCreateUser(1, body);
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(notifs.isEmpty());
+  }
+
+  @Test
+  void notificationsDeleteRequiresReadThenRemoves() throws Exception {
+    List<NotificationRecord> notifs = new ArrayList<>();
+    NotificationRecord n = new NotificationRecord();
+    n.id = 1;
+    n.user_id = 3;
+    n.title = "Test";
+    n.body = "";
+    n.read = false;
+    n.created_at = Instant.now();
+    n.category = "system";
+    notifs.add(n);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("notifications.json"), notifs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.notificationSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    ApiException unread = assertThrows(ApiException.class, () -> svc.notificationsDelete(3, 1));
+    assertEquals(400, unread.status);
+
+    n.read = true;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("notifications.json"), notifs);
+    assertDoesNotThrow(() -> svc.notificationsDelete(3, 1));
+    List<NotificationRecord> after = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(after.isEmpty());
+  }
+
+  @Test
+  void notificationsDeleteWrongUserReturns404() throws Exception {
+    List<NotificationRecord> notifs = new ArrayList<>();
+    NotificationRecord n = new NotificationRecord();
+    n.id = 1;
+    n.user_id = 3;
+    n.title = "T";
+    n.body = "";
+    n.read = true;
+    n.created_at = Instant.now();
+    n.category = "system";
+    notifs.add(n);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("notifications.json"), notifs);
+
+    ApiException ex = assertThrows(ApiException.class, () -> svc.notificationsDelete(2, 1));
+    assertEquals(404, ex.status);
+  }
+
+  @Test
+  void taDeleteOwnAccountNotifiesAdmin() throws Exception {
+    assertDoesNotThrow(() -> svc.deleteOwnAccount(3, Map.of("password", "Ta123456")));
+
+    List<UserRecord> users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    assertTrue(users.stream().noneMatch(u -> u.id == 3));
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    NotificationRecord toAdmin = notifs.stream().filter(n -> n.user_id == 1).findFirst().orElseThrow();
+    assertTrue(toAdmin.title.contains("注销"));
+    assertTrue(toAdmin.body.contains("ta@test.edu"));
+  }
+
+  @Test
+  void taDeleteOwnAccountWrongPassword() {
+    ApiException ex = assertThrows(ApiException.class, () -> svc.deleteOwnAccount(3, Map.of("password", "nope")));
+    assertEquals(400, ex.status);
+  }
+
+  @Test
+  void adminCannotSelfDeleteAccount() {
+    ApiException ex = assertThrows(ApiException.class, () -> svc.deleteOwnAccount(1, Map.of("password", "Admin12345")));
+    assertEquals(403, ex.status);
+  }
+
+  @Test
+  void moWithCreatedJobCannotDeleteAccount() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "Owned";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 1;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    ApiException ex = assertThrows(ApiException.class, () -> svc.deleteOwnAccount(2, Map.of("password", "Mo123456")));
+    assertEquals(400, ex.status);
+  }
+
+  @Test
   void applyRejectedAfterDeadline() throws Exception {
     List<JobRecord> jobs = new ArrayList<>();
     JobRecord j = new JobRecord();
@@ -253,6 +435,32 @@ class TaRecruitServiceCoreTest {
   }
 
   @Test
+  void taListJobsMarksFavoritedWhenNotUsingFavoritesOnlyFilter() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "FavStar";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.deadline = "";
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    assertDoesNotThrow(() -> svc.taToggleFavorite(3, 1));
+    Map<String, Object> row = svc.listJobs(3, null, null, "open", null, false, null).stream()
+        .filter(m -> m.get("id").equals(1))
+        .findFirst()
+        .orElseThrow();
+    assertEquals(true, row.get("favorited"));
+  }
+
+  @Test
   void moListJobsKeepsTrueStatusWhenDeadlinePassed() throws Exception {
     List<JobRecord> jobs = new ArrayList<>();
     JobRecord j = new JobRecord();
@@ -296,6 +504,78 @@ class TaRecruitServiceCoreTest {
   }
 
   @Test
+  void applyJobNotifiesMoOwner() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "NotifyMo";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    assertDoesNotThrow(() -> svc.applyJob(3, 1));
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(notifs.stream().anyMatch(
+        n -> n.user_id == 2
+            && "application".equals(n.category)
+            && n.link_job_id != null
+            && n.link_job_id == 1
+            && n.title.contains("新申请")));
+  }
+
+  @Test
+  void moJobsIncludesPendingApplicationsCount() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "WithPending";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 3;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    List<ApplicationRecord> apps = new ArrayList<>();
+    ApplicationRecord a1 = new ApplicationRecord();
+    a1.id = 1;
+    a1.job_id = 1;
+    a1.ta_user_id = 3;
+    a1.status = "pending";
+    a1.created_at = Instant.now();
+    apps.add(a1);
+    ApplicationRecord a2 = new ApplicationRecord();
+    a2.id = 2;
+    a2.job_id = 1;
+    a2.ta_user_id = 3;
+    a2.status = "interviewing";
+    a2.created_at = Instant.now();
+    apps.add(a2);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("applications.json"), apps);
+
+    Map<String, Object> row = svc.moJobs(2, "").stream()
+        .filter(m -> m.get("id").equals(1))
+        .findFirst()
+        .orElseThrow();
+    assertEquals(1, ((Number) row.get("pending_applications_count")).intValue());
+  }
+
+  @Test
   void applicationStatusMachineEnforced() throws Exception {
     List<JobRecord> jobs = new ArrayList<>();
     JobRecord j = new JobRecord();
@@ -325,5 +605,209 @@ class TaRecruitServiceCoreTest {
         () -> svc.moDecideApplication(2, appId, Map.of("status", "rejected")));
     assertEquals(400, ex.status);
     assertTrue(ex.getMessage().contains("Invalid application status transition"));
+  }
+
+  @Test
+  void moDeleteJobRemovesJobAndCascadeWhenClosedOrCancelled() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "ClosedJob";
+    j.status = "closed";
+    j.created_by = 2;
+    j.quota = 2;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+
+    List<ApplicationRecord> apps = new ArrayList<>();
+    ApplicationRecord a = new ApplicationRecord();
+    a.id = 1;
+    a.job_id = 1;
+    a.ta_user_id = 3;
+    a.status = "pending";
+    a.created_at = Instant.now();
+    apps.add(a);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("applications.json"), apps);
+
+    List<ApplicationEvaluationRecord> evals = new ArrayList<>();
+    ApplicationEvaluationRecord ev = new ApplicationEvaluationRecord();
+    ev.id = 1;
+    ev.application_id = 1;
+    ev.job_id = 1;
+    ev.updated_by = 2;
+    ev.updated_at = Instant.now();
+    evals.add(ev);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("application_evaluations.json"), evals);
+
+    List<NotificationRecord> notifs = new ArrayList<>();
+    NotificationRecord n = new NotificationRecord();
+    n.id = 1;
+    n.user_id = 3;
+    n.title = "t";
+    n.link_job_id = 1;
+    n.read = false;
+    n.created_at = Instant.now();
+    notifs.add(n);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("notifications.json"), notifs);
+
+    List<AssignmentRecord> assigns = new ArrayList<>();
+    AssignmentRecord asg = new AssignmentRecord();
+    asg.id = 1;
+    asg.ta_user_id = 3;
+    asg.job_id = 1;
+    asg.application_id = 1;
+    asg.assigned_hours = 5;
+    asg.created_at = Instant.now();
+    assigns.add(asg);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("assignments.json"), assigns);
+
+    List<JobFavoriteRecord> favs = new ArrayList<>();
+    JobFavoriteRecord f = new JobFavoriteRecord();
+    f.user_id = 3;
+    f.job_id = 1;
+    favs.add(f);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("job_favorites.json"), favs);
+
+    List<ActivityLogRecord> logs = new ArrayList<>();
+    ActivityLogRecord lg = new ActivityLogRecord();
+    lg.id = 1;
+    lg.actor_user_id = 2;
+    lg.action = "job_closed";
+    lg.entity_type = "job";
+    lg.entity_id = 1;
+    lg.payload = Map.of();
+    lg.created_at = Instant.now();
+    logs.add(lg);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("activity_logs.json"), logs);
+
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    c.applicationSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    Map<String, Object> out = assertDoesNotThrow(() -> svc.moDeleteJob(2, 1));
+    assertTrue(Boolean.TRUE.equals(out.get("ok")));
+
+    List<JobRecord> jobsAfter = AtomicJsonFile.readList(
+        dataDir.resolve("jobs.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<JobRecord>>() {},
+        new ArrayList<>());
+    assertTrue(jobsAfter.stream().noneMatch(x -> x.id == 1));
+
+    List<ApplicationRecord> appsAfter = AtomicJsonFile.readList(
+        dataDir.resolve("applications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<ApplicationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(appsAfter.stream().noneMatch(x -> x.job_id == 1));
+
+    List<ApplicationEvaluationRecord> evalsAfter = AtomicJsonFile.readList(
+        dataDir.resolve("application_evaluations.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<ApplicationEvaluationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(evalsAfter.stream().noneMatch(x -> x.job_id == 1));
+
+    List<NotificationRecord> notifsAfter = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(notifsAfter.stream().noneMatch(x -> Integer.valueOf(1).equals(x.link_job_id)));
+
+    List<AssignmentRecord> assignsAfter = AtomicJsonFile.readList(
+        dataDir.resolve("assignments.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<AssignmentRecord>>() {},
+        new ArrayList<>());
+    assertTrue(assignsAfter.stream().noneMatch(x -> x.job_id == 1));
+
+    List<JobFavoriteRecord> favsAfter = AtomicJsonFile.readList(
+        dataDir.resolve("job_favorites.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<JobFavoriteRecord>>() {},
+        new ArrayList<>());
+    assertTrue(favsAfter.stream().noneMatch(x -> x.job_id == 1));
+
+    List<ActivityLogRecord> logsAfter = AtomicJsonFile.readList(
+        dataDir.resolve("activity_logs.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<ActivityLogRecord>>() {},
+        new ArrayList<>());
+    assertFalse(logsAfter.stream().anyMatch(x -> "job_closed".equals(x.action) && x.entity_id != null && x.entity_id == 1));
+    assertTrue(logsAfter.stream().anyMatch(x -> "job_deleted".equals(x.action)));
+  }
+
+  @Test
+  void moDeleteJobRejectsNonTerminalStatus() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 5;
+    j.module_name = "OpenJob";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 1;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+
+    ApiException ex = assertThrows(ApiException.class, () -> svc.moDeleteJob(2, 5));
+    assertEquals(400, ex.status);
+    assertTrue(ex.getMessage().contains("closed or cancelled"));
+  }
+
+  @Test
+  void publishedJobNotifiesAllTas() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("module_name", "PubMod");
+    body.put("publish", true);
+    Map<String, Object> job = assertDoesNotThrow(() -> svc.moCreateJob(2, body));
+    int jid = ((Number) job.get("id")).intValue();
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    List<NotificationRecord> forTa = notifs.stream().filter(n -> n.user_id == 3).toList();
+    assertEquals(1, forTa.size());
+    assertEquals("job", forTa.get(0).category);
+    assertEquals(jid, forTa.get(0).link_job_id.intValue());
+    assertTrue(forTa.get(0).title.contains("新岗位"));
+  }
+
+  @Test
+  void draftJobDoesNotSendOpenJobNotifications() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("module_name", "DraftMod");
+    body.put("publish", false);
+    assertDoesNotThrow(() -> svc.moCreateJob(2, body));
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(notifs.stream().noneMatch(n -> "job".equals(n.category)));
+  }
+
+  @Test
+  void transitionDraftToOpenNotifiesTas() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "LaterOpen";
+    j.status = "draft";
+    j.created_by = 2;
+    j.quota = 1;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    assertDoesNotThrow(() -> svc.moTransitionJob(2, 1, Map.of("to", "open")));
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(notifs.stream().anyMatch(n -> n.user_id == 3 && "job".equals(n.category) && n.link_job_id == 1));
   }
 }

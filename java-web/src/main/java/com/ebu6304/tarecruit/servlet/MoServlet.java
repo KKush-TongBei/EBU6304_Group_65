@@ -135,6 +135,27 @@ public final class MoServlet extends JsonServlet {
     }
   }
 
+  @Override
+  protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    try {
+      TaRecruitService s = svc(req);
+      int uid = userId(req);
+      String pi = req.getPathInfo();
+      if (pi == null) {
+        resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+        return;
+      }
+      Matcher mj = JOB_ID.matcher(pi);
+      if (mj.matches()) {
+        writeJson(resp, 200, s.moDeleteJob(uid, Integer.parseInt(mj.group(1))));
+        return;
+      }
+      resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+    } catch (Exception e) {
+      handleError(resp, e);
+    }
+  }
+
   protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
     try {
       TaRecruitService s = svc(req);

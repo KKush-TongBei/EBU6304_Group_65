@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { routerBasename } from "./appBase";
 import { AuthProvider } from "./AuthContext";
 import { FeedbackProvider } from "./feedback";
 import { ThemeProvider } from "./theme";
@@ -10,6 +11,7 @@ import AdminHome from "./pages/admin/AdminHome";
 import AdminLogs from "./pages/admin/AdminLogs";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminUsers from "./pages/admin/AdminUsers";
+import MOAccount from "./pages/mo/MOAccount";
 import MOHome from "./pages/mo/MOHome";
 import MOJobDetail from "./pages/mo/MOJobDetail";
 import MOJobs from "./pages/mo/MOJobs";
@@ -25,7 +27,7 @@ export default function App() {
     <ThemeProvider>
       <FeedbackProvider>
         <AuthProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={routerBasename()}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
@@ -81,6 +83,14 @@ export default function App() {
                 }
               />
               <Route
+                path="/mo/jobs/:id"
+                element={
+                  <RequireRole role="mo">
+                    <MOJobDetail />
+                  </RequireRole>
+                }
+              />
+              <Route
                 path="/mo/jobs"
                 element={
                   <RequireRole role="mo">
@@ -97,10 +107,10 @@ export default function App() {
                 }
               />
               <Route
-                path="/mo/jobs/:id"
+                path="/mo/account"
                 element={
                   <RequireRole role="mo">
-                    <MOJobDetail />
+                    <MOAccount />
                   </RequireRole>
                 }
               />

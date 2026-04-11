@@ -1,0 +1,279 @@
+[ {
+  "id" : 1,
+  "actor_user_id" : 1,
+  "action" : "seed_admin",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T02:36:50.052020Z"
+}, {
+  "id" : 2,
+  "actor_user_id" : 1,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T02:39:28.427443Z"
+}, {
+  "id" : 3,
+  "actor_user_id" : 2,
+  "action" : "register",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "role" : "ta",
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T02:54:09.169318Z"
+}, {
+  "id" : 4,
+  "actor_user_id" : 2,
+  "action" : "cv_uploaded",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "file_id" : 1
+  },
+  "created_at" : "2026-04-11T02:56:28.038808Z"
+}, {
+  "id" : 5,
+  "actor_user_id" : 2,
+  "action" : "profile_updated",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : { },
+  "created_at" : "2026-04-11T02:57:09.908727Z"
+}, {
+  "id" : 6,
+  "actor_user_id" : 2,
+  "action" : "profile_updated",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : { },
+  "created_at" : "2026-04-11T02:57:12.864263Z"
+}, {
+  "id" : 7,
+  "actor_user_id" : 2,
+  "action" : "profile_updated",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : { },
+  "created_at" : "2026-04-11T02:57:32.199213Z"
+}, {
+  "id" : 8,
+  "actor_user_id" : 2,
+  "action" : "profile_updated",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : { },
+  "created_at" : "2026-04-11T02:57:43.802976Z"
+}, {
+  "id" : 9,
+  "actor_user_id" : 3,
+  "action" : "register",
+  "entity_type" : "user",
+  "entity_id" : 3,
+  "payload" : {
+    "role" : "mo",
+    "email" : "kushhhhhhhhhh@icloud.com"
+  },
+  "created_at" : "2026-04-11T03:12:48.099543Z"
+}, {
+  "id" : 11,
+  "actor_user_id" : 3,
+  "action" : "job_created",
+  "entity_type" : "job",
+  "entity_id" : 2,
+  "payload" : {
+    "module_name" : "Invigilator"
+  },
+  "created_at" : "2026-04-11T03:22:53.271911Z"
+}, {
+  "id" : 12,
+  "actor_user_id" : 3,
+  "action" : "job_closed",
+  "entity_type" : "job",
+  "entity_id" : 2,
+  "payload" : { },
+  "created_at" : "2026-04-11T03:23:26.285639Z"
+}, {
+  "id" : 15,
+  "actor_user_id" : 2,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T03:26:07.923605Z"
+}, {
+  "id" : 16,
+  "actor_user_id" : 3,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 3,
+  "payload" : {
+    "email" : "kushhhhhhhhhh@icloud.com"
+  },
+  "created_at" : "2026-04-11T06:46:16.737428Z"
+}, {
+  "id" : 17,
+  "actor_user_id" : 3,
+  "action" : "job_deleted",
+  "entity_type" : "job",
+  "entity_id" : 3,
+  "payload" : {
+    "module_name" : "Event Support"
+  },
+  "created_at" : "2026-04-11T06:46:24.212341Z"
+}, {
+  "id" : 18,
+  "actor_user_id" : 3,
+  "action" : "job_created",
+  "entity_type" : "job",
+  "entity_id" : 4,
+  "payload" : {
+    "module_name" : "Lab TA"
+  },
+  "created_at" : "2026-04-11T06:46:34.321991Z"
+}, {
+  "id" : 19,
+  "actor_user_id" : 2,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T06:46:47.553621Z"
+}, {
+  "id" : 20,
+  "actor_user_id" : 2,
+  "action" : "application_submitted",
+  "entity_type" : "application",
+  "entity_id" : 1,
+  "payload" : {
+    "job_id" : 4
+  },
+  "created_at" : "2026-04-11T06:47:53.446770Z"
+}, {
+  "id" : 21,
+  "actor_user_id" : 3,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 3,
+  "payload" : {
+    "email" : "kushhhhhhhhhh@icloud.com"
+  },
+  "created_at" : "2026-04-11T06:48:06.715895Z"
+}, {
+  "id" : 22,
+  "actor_user_id" : 3,
+  "action" : "evaluation_saved",
+  "entity_type" : "application",
+  "entity_id" : 1,
+  "payload" : { },
+  "created_at" : "2026-04-11T06:49:10.665883Z"
+}, {
+  "id" : 23,
+  "actor_user_id" : 3,
+  "action" : "application_interviewing",
+  "entity_type" : "application",
+  "entity_id" : 1,
+  "payload" : {
+    "job_id" : 4,
+    "ta_id" : 2,
+    "decision" : "interviewing",
+    "total_score" : 0,
+    "label" : ""
+  },
+  "created_at" : "2026-04-11T06:49:18.535841Z"
+}, {
+  "id" : 24,
+  "actor_user_id" : 3,
+  "action" : "application_accepted",
+  "entity_type" : "application",
+  "entity_id" : 1,
+  "payload" : {
+    "job_id" : 4,
+    "ta_id" : 2,
+    "decision" : "accepted",
+    "total_score" : 0,
+    "label" : ""
+  },
+  "created_at" : "2026-04-11T06:49:33.531969Z"
+}, {
+  "id" : 25,
+  "actor_user_id" : 1,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T06:57:47.236714Z"
+}, {
+  "id" : 26,
+  "actor_user_id" : 3,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 3,
+  "payload" : {
+    "email" : "kushhhhhhhhhh@icloud.com"
+  },
+  "created_at" : "2026-04-11T07:00:00.090639Z"
+}, {
+  "id" : 28,
+  "actor_user_id" : 3,
+  "action" : "job_deleted",
+  "entity_type" : "job",
+  "entity_id" : 1,
+  "payload" : {
+    "module_name" : "Lab TA"
+  },
+  "created_at" : "2026-04-11T07:00:15.327552Z"
+}, {
+  "id" : 29,
+  "actor_user_id" : 3,
+  "action" : "job_created",
+  "entity_type" : "job",
+  "entity_id" : 5,
+  "payload" : {
+    "module_name" : "Exam Marker"
+  },
+  "created_at" : "2026-04-11T07:00:22.793062Z"
+}, {
+  "id" : 30,
+  "actor_user_id" : 2,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T07:00:39.075815Z"
+}, {
+  "id" : 31,
+  "actor_user_id" : 2,
+  "action" : "application_submitted",
+  "entity_type" : "application",
+  "entity_id" : 2,
+  "payload" : {
+    "job_id" : 5
+  },
+  "created_at" : "2026-04-11T07:01:20.309789Z"
+}, {
+  "id" : 32,
+  "actor_user_id" : 3,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 3,
+  "payload" : {
+    "email" : "kushhhhhhhhhh@icloud.com"
+  },
+  "created_at" : "2026-04-11T07:01:32.573035Z"
+} ]

@@ -8,7 +8,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
 
-@WebServlet(urlPatterns = {"/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/me"})
+@WebServlet(urlPatterns = {
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/logout",
+    "/api/auth/me",
+    "/api/auth/delete-account"})
 public final class AuthServlet extends JsonServlet {
   @Override
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -20,6 +25,10 @@ public final class AuthServlet extends JsonServlet {
         return;
       }
       Map<String, Object> body = readMap(req);
+      if (path.endsWith("/delete-account")) {
+        writeJson(resp, 200, s.deleteOwnAccount(userId(req), body));
+        return;
+      }
       if (path.endsWith("/login")) {
         Map<String, Object> partial = s.login(body);
         int uid = ((Number) partial.get("_uid")).intValue();

@@ -1,2 +1,2 @@
 /target/
-/data/
+# 组内共享：跟踪 java-web/data（含 uploads/、cv_payloads/）；注意含简历等敏感内容时勿推公开仓库
