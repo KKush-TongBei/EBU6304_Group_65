@@ -1,4 +1,2 @@
 /target/
-# 组内共享：跟踪 data 下 JSON；上传与简历原文体积大且可能含隐私，不入库
-/data/uploads/
-/data/cv_payloads/
+# 组内共享：跟踪 java-web/data（含 uploads/、cv_payloads/）；注意含简历等敏感内容时勿推公开仓库
