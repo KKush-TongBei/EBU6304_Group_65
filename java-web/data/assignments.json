@@ -1,1 +1,9 @@
-[ ]
+[ {
+  "id" : 1,
+  "ta_user_id" : 2,
+  "job_id" : 4,
+  "application_id" : 1,
+  "assigned_hours" : 6.0,
+  "term" : "2025-2026-1",
+  "created_at" : "2026-04-11T06:49:33.531588Z"
+} ]
