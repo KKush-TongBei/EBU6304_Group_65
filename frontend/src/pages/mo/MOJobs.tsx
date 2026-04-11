@@ -53,14 +53,16 @@ export default function MOJobs() {
           {jobs.map((j) => (
             <Link key={j.id} to={`/mo/jobs/${j.id}`}>
               <Card className="p-5 hover:shadow-md transition cursor-pointer">
-                <div className="flex flex-wrap justify-between gap-2">
-                  <div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-ink-950 dark:text-white">{j.module_name}</h3>
                     <p className="text-xs text-ink-500 dark:text-slate-400 mt-1">
                       截止 {j.deadline || "—"} · {j.assigned_hours}h/人 · 名额 {j.accepted_count ?? 0}/{j.quota ?? 1}
                     </p>
                   </div>
-                  <StatusBadge status={j.status as JobStatus} />
+                  <div className="shrink-0 self-center">
+                    <StatusBadge status={j.status as JobStatus} pill={false} />
+                  </div>
                 </div>
               </Card>
             </Link>

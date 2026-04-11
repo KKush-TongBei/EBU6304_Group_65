@@ -34,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -812,7 +813,12 @@ public final class TaRecruitService {
       j.updated_at = now;
       jobs.add(j);
       logActivityUnsafe(logs, c, mo.id, "job_created", "job", j.id, Map.of("module_name", j.module_name));
-      saveAll(users, jobs, null, null, null, logs, c);
+      List<NotificationRecord> notifs = null;
+      if ("open".equals(j.status)) {
+        notifs = readNotificationsUnsafe();
+        notifyAllTasNewOpenJob(notifs, users, st, j, c);
+      }
+      saveAll(users, jobs, null, notifs, null, logs, c);
       List<ApplicationRecord> appsForCount = readApplicationsUnsafe();
       return jobOut(j, false, appsForCount);
     } catch (IOException e) {
@@ -900,6 +906,58 @@ public final class TaRecruitService {
     }
   }
 
+  /**
+   * Permanently removes a job and cascaded rows when status is {@code closed} or {@code cancelled}.
+   * Does not delete TA CV payload files (user-scoped).
+   */
+  public Map<String, Object> moDeleteJob(int userId, int jobId) {
+    rw.writeLock().lock();
+    try {
+      List<UserRecord> users = readUsersUnsafe();
+      UserRecord mo = requireRole(requireUserUnsafe(users, userId), "mo");
+      List<JobRecord> jobs = readJobsUnsafe();
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      List<ApplicationEvaluationRecord> evals = readEvaluationsUnsafe();
+      List<NotificationRecord> notifs = readNotificationsUnsafe();
+      List<AssignmentRecord> assigns = readAssignmentsUnsafe();
+      List<JobFavoriteRecord> favs = readFavoritesUnsafe();
+      List<ActivityLogRecord> logs = readLogsUnsafe();
+      Counters c = readCountersUnsafe();
+      JobRecord job = ensureOwnJob(jobs, jobId, mo.id);
+      String st = job.status != null ? job.status : "";
+      if (!"closed".equals(st) && !"cancelled".equals(st)) {
+        throw new ApiException(400, "Only closed or cancelled jobs can be deleted");
+      }
+      String moduleName = job.module_name != null ? job.module_name : "";
+      Set<Integer> appIds = apps.stream()
+          .filter(a -> a.job_id == jobId)
+          .map(a -> a.id)
+          .collect(Collectors.toSet());
+      jobs.removeIf(j -> j.id == jobId);
+      apps.removeIf(a -> a.job_id == jobId);
+      evals.removeIf(e -> e.job_id == jobId || appIds.contains(e.application_id));
+      notifs.removeIf(n ->
+          Objects.equals(n.link_job_id, jobId)
+              || (n.application_id != null && appIds.contains(n.application_id))
+              || (n.link_application_id != null && appIds.contains(n.link_application_id)));
+      assigns.removeIf(a -> a.job_id == jobId);
+      favs.removeIf(f -> f.job_id == jobId);
+      logs.removeIf(log ->
+          ("job".equals(log.entity_type) && log.entity_id != null && log.entity_id == jobId)
+              || ("application".equals(log.entity_type) && log.entity_id != null && appIds.contains(log.entity_id)));
+      logActivityUnsafe(logs, c, mo.id, "job_deleted", "job", jobId,
+          Map.of("module_name", moduleName));
+      saveAll(users, jobs, apps, notifs, assigns, logs, c);
+      saveEvaluationsUnsafe(evals);
+      saveFavoritesUnsafe(favs);
+      return Map.of("ok", true);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
   public Map<String, Object> moTransitionJob(int userId, int jobId, Map<String, Object> body) {
     rw.writeLock().lock();
     try {
@@ -917,7 +975,13 @@ public final class TaRecruitService {
       job.updated_at = Instant.now();
       logActivityUnsafe(logs, c, mo.id, "job_status_changed", "job", job.id,
           Map.of("to", to));
-      saveAll(users, jobs, null, null, null, logs, c);
+      List<NotificationRecord> notifs = null;
+      if ("open".equals(to)) {
+        notifs = readNotificationsUnsafe();
+        SettingsRecord st = readSettingsMergedUnsafe();
+        notifyAllTasNewOpenJob(notifs, users, st, job, c);
+      }
+      saveAll(users, jobs, null, notifs, null, logs, c);
       List<ApplicationRecord> appsForCount = readApplicationsUnsafe();
       return jobOut(job, false, appsForCount);
     } catch (IOException e) {
@@ -2132,6 +2196,39 @@ public final class TaRecruitService {
       throw new ApiException(403, "Forbidden");
     }
     return u;
+  }
+
+  /** Fan-out to every TA when a job becomes open for applications. */
+  private void notifyAllTasNewOpenJob(
+      List<NotificationRecord> notifs,
+      List<UserRecord> users,
+      SettingsRecord settings,
+      JobRecord job,
+      Counters c) {
+    if (!settings.notifications_enabled) {
+      return;
+    }
+    String module = job.module_name != null ? job.module_name : "";
+    String deadlineHint =
+        job.deadline != null && !job.deadline.isBlank() ? " 截止日期：" + job.deadline + "。" : "";
+    Instant now = Instant.now();
+    for (UserRecord u : users) {
+      if (!"ta".equals(u.role)) {
+        continue;
+      }
+      NotificationRecord n = new NotificationRecord();
+      n.id = c.notificationSeq++;
+      n.user_id = u.id;
+      n.title = "新岗位开放申请";
+      n.body = "模块「" + module + "」已发布，可前往浏览岗位并申请。" + deadlineHint;
+      n.application_id = null;
+      n.read = false;
+      n.created_at = now;
+      n.category = "job";
+      n.link_job_id = job.id;
+      n.link_application_id = null;
+      notifs.add(n);
+    }
   }
 
   private void logActivityUnsafe(

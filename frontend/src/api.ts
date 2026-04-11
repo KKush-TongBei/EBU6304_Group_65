@@ -185,6 +185,8 @@ export const api = {
       request<Job>(`/api/mo/jobs/${id}/transition`, { method: "POST", json: { to } }),
     closeJob: (id: number) =>
       request<Job>(`/api/mo/jobs/${id}/close`, { method: "POST" }),
+    deleteJob: (id: number) =>
+      request<{ ok: boolean }>(`/api/mo/jobs/${id}`, { method: "DELETE" }),
     applicants: (jobId: number, params?: { sort?: string; status?: string }) => {
       const sp = new URLSearchParams();
       if (params?.sort) sp.set("sort", params.sort);

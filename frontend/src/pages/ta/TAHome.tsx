@@ -113,11 +113,19 @@ export default function TAHome() {
           className="mb-6 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-wrap items-center justify-between gap-3"
           role="status"
         >
-          <div>
+          <div className="min-w-0">
             <p className="font-semibold text-amber-950 dark:text-amber-100">
               您有 {unread.length} 条未读通知
             </p>
             <p className="text-sm text-amber-900 dark:text-amber-200/90 mt-1">{unread[0]?.body}</p>
+            {unread[0] && notifLink(unread[0]) ? (
+              <Link
+                to={notifLink(unread[0])!}
+                className="text-sm font-semibold text-accent mt-2 inline-block hover:underline"
+              >
+                点击查看 / 前往相关页面 →
+              </Link>
+            ) : null}
           </div>
           <Button variant="secondary" onClick={markAll}>
             全部标为已读
@@ -179,19 +187,33 @@ export default function TAHome() {
                     className="text-sm border-b border-slate-100 dark:border-slate-800 pb-2 flex flex-wrap items-start justify-between gap-2"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
-                        {!n.read && <Badge tone="warn">未读</Badge>}
-                        {n.category ? (
-                          <span className="text-xs text-ink-500 dark:text-slate-400">[{n.category}]</span>
-                        ) : null}
-                      </div>
-                      <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
                       {href ? (
-                        <Link to={href} className="text-accent text-xs mt-1 inline-block hover:underline">
-                          前往相关页面 →
+                        <Link
+                          to={href}
+                          className="block rounded-lg -mx-1 px-1 py-1 hover:bg-slate-100 dark:hover:bg-slate-800/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                        >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
+                            {!n.read && <Badge tone="warn">未读</Badge>}
+                            {n.category ? (
+                              <span className="text-xs text-ink-500 dark:text-slate-400">[{n.category}]</span>
+                            ) : null}
+                          </div>
+                          <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
+                          <span className="text-accent text-xs mt-1 inline-block">点击进入浏览岗位 / 相关页面 →</span>
                         </Link>
-                      ) : null}
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
+                            {!n.read && <Badge tone="warn">未读</Badge>}
+                            {n.category ? (
+                              <span className="text-xs text-ink-500 dark:text-slate-400">[{n.category}]</span>
+                            ) : null}
+                          </div>
+                          <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
+                        </>
+                      )}
                     </div>
                     {!n.read && (
                       <Button variant="ghost" className="!py-1 !px-2 text-xs shrink-0" onClick={() => markOne(n.id)}>

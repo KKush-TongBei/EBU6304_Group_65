@@ -100,17 +100,28 @@ export default function NotificationsPage({ role }: { role: UserRole }) {
                   }`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <span className="font-semibold text-ink-900 dark:text-slate-100">{n.title}</span>
-                      {n.category ? (
-                        <span className="text-xs text-ink-500 dark:text-slate-400 ml-2">[{n.category}]</span>
-                      ) : null}
-                      <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
+                    <div className="min-w-0 flex-1">
                       {href ? (
-                        <Link to={href} className="text-accent text-xs mt-2 inline-block hover:underline">
-                          前往相关页面 →
+                        <Link
+                          to={href}
+                          className="block rounded-lg -mx-1 px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                        >
+                          <span className="font-semibold text-ink-900 dark:text-slate-100">{n.title}</span>
+                          {n.category ? (
+                            <span className="text-xs text-ink-500 dark:text-slate-400 ml-2">[{n.category}]</span>
+                          ) : null}
+                          <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
+                          <span className="text-accent text-xs mt-2 inline-block">点击进入相关页面 →</span>
                         </Link>
-                      ) : null}
+                      ) : (
+                        <>
+                          <span className="font-semibold text-ink-900 dark:text-slate-100">{n.title}</span>
+                          {n.category ? (
+                            <span className="text-xs text-ink-500 dark:text-slate-400 ml-2">[{n.category}]</span>
+                          ) : null}
+                          <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
+                        </>
+                      )}
                     </div>
                     {!n.read && (
                       <Button variant="ghost" className="!py-1 !px-2 text-xs shrink-0" onClick={() => markOne(n.id)}>

@@ -5,3 +5,9 @@
 body {
   @apply bg-slate-100 text-ink-900 antialiased min-h-screen dark:bg-slate-950 dark:text-slate-100;
 }
+
+/* Native <select> / <option> follow OS theme; align with app dark mode for readable dropdowns. */
+.dark select option {
+  background-color: rgb(15 23 42);
+  color: rgb(241 245 249);
+}
