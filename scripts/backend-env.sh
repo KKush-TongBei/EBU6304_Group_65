@@ -32,3 +32,7 @@ mkdir -p "$TA_DATA_DIR"
 
 # 本地开发默认密钥（生产务必覆盖 TA_JWT_SECRET）
 export TA_JWT_SECRET="${TA_JWT_SECRET:-dev-only-change-me-not-for-production}"
+
+# 可选：同时设置两项则覆盖 README 演示管理员；不设则由应用内默认值种子（仅当尚无 admin 时）
+# export TA_SEED_ADMIN_EMAIL=...
+# export TA_SEED_ADMIN_PASSWORD=...

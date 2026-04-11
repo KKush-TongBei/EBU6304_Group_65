@@ -40,7 +40,7 @@ Tie Wang 231226543 gitid:WANGNNNnnn
 
 ### 管理员登录（组内开发 / 演示）
 
-前端**公开注册**仅可创建 **TA**；管理员需在数据里已存在。组内约定使用下列**演示账号**登录后台（在项目根目录执行脚本时，数据目录一般为 `java-web/data/`）：
+前端**公开注册**可创建 **TA / MO**；**管理员**不能通过前端自注册。组内约定使用下列**演示账号**登录后台（数据目录一般为 `java-web/data/`）：
 
 | | |
 |---|---|
@@ -50,10 +50,11 @@ Tie Wang 231226543 gitid:WANGNNNnnn
 **说明：**
 
 - 仅用于**本地与课程演示**，勿用于公网或真实生产环境；提交作业 ZIP 时请按课程要求处理数据，勿泄露敏感信息。
-- 若你本地 **`java-web/data/users.json`** 里还没有该管理员：可向组长索取含该用户的 `users.json` 片段；或在**当前没有任何 admin 用户**时，启动后端前执行  
-  `export TA_SEED_ADMIN_EMAIL=zyx1678162910@gmail.com`  
-  `export TA_SEED_ADMIN_PASSWORD=admin123456`  
-  再运行 Tomcat / `./scripts/tomcat-run.sh`，系统会在首次启动时自动创建该管理员。
+- **首次启动**：若数据中尚无任何 `admin` 用户，后端在启动时会**自动创建**上表中的演示管理员（无需再手动 `export`）。若已存在其他 admin，则不会覆盖。
+- **自定义管理员种子**：在**当前没有任何 admin 用户**时，可同时设置  
+  `TA_SEED_ADMIN_EMAIL` 与 `TA_SEED_ADMIN_PASSWORD`  
+  再启动 Tomcat / `./scripts/tomcat-run.sh`，将用你提供的邮箱与密码创建管理员（请**同时设置两项**，勿只设其一）。
+- 也可向组长索取含该管理员的 `users.json` 片段，放入 `java-web/data/`。
 
 ### 1. 构建 WAR
 
@@ -76,6 +77,8 @@ mvn package
 - JVM 参数 **`-Dta.data.dir=/path/to/data`**
 
 生产环境请设置 **`TA_JWT_SECRET`**（或 `SECRET_KEY`）为足够长的随机串；亦可于 `java-web/src/main/webapp/WEB-INF/web.xml` 的 `secretKey` 上下文参数中配置（留空则使用内置默认值，仅适合本地）。变量名示例见根目录 [`.env.example`](.env.example)。
+
+**组内多台电脑同步用户与业务数据：** `java-web/data/`（含 **`*.json`**、**`uploads/`**、**`cv_payloads/`** 等）已配置为可由 Git 跟踪。新建用户、上传简历或改数据后请 **`git add java-web/data` + `commit` + `push`**，其他成员 **`git pull`** 后即可一致。删除用户记录目前需**手动编辑 `users.json`** 或后续扩展「管理员删除 / 用户注销」接口；**换电脑本身不会清空数据**，只要仓库里已有提交。若仓库为**公开**或交作业打包，请自行脱敏或排除敏感文件。
 
 ### 3. 前端嵌入 WAR（同源 `/api`）
 
@@ -123,7 +126,7 @@ npm run dev
 - **数据文件**：`data/users.json`（可通过 `TA_DATA_DIR` / `-Dta.data.dir` 指向具体目录）；角色支持 `ta`、`mo`、`admin`。
 - **DAO 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserDAO.java`，负责 `users.json` 的读取/写入，默认单例 `getInstance()`，并用读写锁保护并发访问。
 - **Service 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserService.java`，提供 `register` / `login` 业务逻辑，以及供主流程调用的 `persistNewTa`（指定用户 id，与 `counters.json` 对齐）、`passwordMatches`（登录验密）。
-- **与现有接口衔接**：`AuthServlet` 仍暴露 `/api/auth/register`、`/api/auth/login`；公开 **TA 注册** 时由 `TaRecruitService` 调用 `UserService.persistNewTa` 经 `UserDAO` 写入 `users.json`；**管理员创建 MO/Admin**（`/api/admin/users`）与 **环境变量种子管理员**（`ensureSeedAdmin`）同样经 `UserService.persistNewStaff` 写入同一 `users.json`，与公开注册路径一致。**登录验密** 走 `UserService.passwordMatches`（BCrypt）。JWT 签发、活动日志与计数器仍由 `TaRecruitService` 统一处理。
+- **与现有接口衔接**：`AuthServlet` 仍暴露 `/api/auth/register`、`/api/auth/login`；公开 **TA/MO 注册** 时由 `TaRecruitService` 调用 `UserService` 写入 `users.json`；**管理员创建 MO/Admin**（`/api/admin/users`）同样经 `UserService.persistNewStaff` 写入同一 `users.json`。**管理员创建 MO** 须填职工号（`student_id`），活动日志动作与公开 MO 注册同为 **`register`**，详情 JSON 中含 `created_by_admin_id` 便于区分代建；创建 Admin 仍为 **`user_created_by_admin`**。**环境变量种子管理员**（`ensureSeedAdmin`）同上。**登录验密** 走 `UserService.passwordMatches`（BCrypt）。JWT 签发、活动日志与计数器仍由 `TaRecruitService` 统一处理。
 - **密码安全**：注册时使用 BCrypt 哈希加盐（`Passwords.hash`），登录时使用 BCrypt 校验（经 `UserService`/`Passwords.verify`），不存明文密码。
 - **测试**：`java-web/src/test/java/com/ebu6304/tarecruit/user/UserServiceTest.java`，覆盖注册加密、登录校验、重复邮箱、JSON 损坏错误处理。
 

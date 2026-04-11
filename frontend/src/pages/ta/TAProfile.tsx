@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { api, downloadWithAuth } from "../../api";
+import { useNavigate } from "react-router-dom";
+import { api, downloadWithAuth, setToken } from "../../api";
 import { useFeedback } from "../../feedback";
 import type { User } from "../../types";
 import AppShell from "../../AppShell";
@@ -16,10 +17,13 @@ function tagsToList(s: string): string[] {
 
 export default function TAProfile() {
   const { toast } = useFeedback();
+  const nav = useNavigate();
   const [u, setU] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const [skillTagsText, setSkillTagsText] = useState("");
+  const [deletePwd, setDeletePwd] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -96,6 +100,25 @@ export default function TAProfile() {
       await downloadWithAuth(api.ta.cvDownloadUrl(u.cv_file_id), name);
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : "下载失败", "error");
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!deletePwd.trim()) {
+      toast("请输入当前密码以确认注销", "error");
+      return;
+    }
+    if (!window.confirm("确定要永久注销账号吗？此操作不可恢复。")) return;
+    setDeleting(true);
+    try {
+      await api.auth.deleteAccount(deletePwd);
+      setToken(null);
+      toast("账号已注销", "success");
+      nav("/login?reason=account_deleted", { replace: true });
+    } catch (e2: unknown) {
+      toast(e2 instanceof Error ? e2.message : "注销失败", "error");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -261,6 +284,28 @@ export default function TAProfile() {
 
           <Button type="submit">保存资料</Button>
         </form>
+      </Card>
+
+      <Card className="p-6 max-w-2xl mt-6 border-rose-200 dark:border-rose-900/50">
+        <h2 className="font-display text-lg font-bold text-rose-800 dark:text-rose-300">危险操作</h2>
+        <p className="mt-2 text-sm text-ink-600 dark:text-slate-400">
+          注销后您的账号、申请与收藏等数据将从系统中移除，且无法恢复。管理员会收到一条系统通知。
+        </p>
+        <div className="mt-4 space-y-2 max-w-md">
+          <label htmlFor="del-pwd" className="text-xs font-semibold text-ink-700 dark:text-slate-300">
+            输入当前密码确认
+          </label>
+          <Input
+            id="del-pwd"
+            type="password"
+            autoComplete="current-password"
+            value={deletePwd}
+            onChange={(e) => setDeletePwd(e.target.value)}
+          />
+          <Button type="button" variant="secondary" className="!border-rose-300 !text-rose-800 dark:!border-rose-800 dark:!text-rose-200" disabled={deleting} onClick={deleteAccount}>
+            {deleting ? "处理中…" : "注销账号"}
+          </Button>
+        </div>
       </Card>
     </AppShell>
   );

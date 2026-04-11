@@ -34,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -192,22 +193,42 @@ public final class TaRecruitService {
       if (studentId == null || studentId.isBlank()) {
         throw new ApiException(400, role == UserRole.TA ? "TA accounts require student_id" : "MO accounts require staff_id");
       }
+      String sid = studentId.strip();
       String dn = optStr(body.get("display_name"));
       int newId = c.userSeq;
       try {
         if (role == UserRole.TA) {
-          userAccounts.persistNewTa(newId, email, password, dn, studentId.strip());
+          userAccounts.persistNewTa(newId, email, password, dn, sid);
         } else {
-          userAccounts.persistNewStaff(newId, email, password, UserRole.MO, dn, studentId.strip());
+          userAccounts.persistNewStaff(newId, email, password, UserRole.MO, dn, sid);
         }
       } catch (IllegalArgumentException ex) {
         throw mapUserServiceToApi(ex);
       }
       c.userSeq = newId + 1;
       String storedEmail = email.trim().toLowerCase(Locale.ROOT);
-      logActivityUnsafe(logs, c, newId, "register", "user", newId,
-          Map.of("email", storedEmail, "role", role.value()));
-      saveAll(null, null, null, null, null, logs, c);
+      Map<String, Object> regPayload = new LinkedHashMap<>();
+      regPayload.put("email", storedEmail);
+      regPayload.put("role", role.value());
+      regPayload.put("student_id", sid);
+      logActivityUnsafe(logs, c, newId, "register", "user", newId, regPayload);
+      List<UserRecord> usersAfterReg = readUsersUnsafe();
+      List<NotificationRecord> notifs = null;
+      SettingsRecord settings = readSettingsMergedUnsafe();
+      if (settings.notifications_enabled) {
+        notifs = readNotificationsUnsafe();
+        String roleLabel = role == UserRole.TA ? "助教" : "课程负责人";
+        String nameHint = (dn != null && !dn.isBlank()) ? dn.strip() : storedEmail;
+        notifyAdminsUnsafe(
+            notifs,
+            usersAfterReg,
+            settings,
+            c,
+            "新用户注册",
+            roleLabel + "「" + nameHint + "」已通过公开注册加入系统（学号/工号：" + sid + "，邮箱：" + storedEmail + "）。",
+            "system");
+      }
+      saveAll(null, null, null, notifs, null, logs, c);
       return tokenMap(newId);
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -236,6 +257,9 @@ public final class TaRecruitService {
       }
       String dn = optStr(body.get("display_name"));
       String studentId = optStr(body.get("student_id"));
+      if (role == UserRole.MO && (studentId == null || studentId.isBlank())) {
+        throw new ApiException(400, "MO accounts require staff_id");
+      }
       int newId = c.userSeq;
       try {
         userAccounts.persistNewStaff(newId, email, password, role, dn, studentId);
@@ -244,8 +268,17 @@ public final class TaRecruitService {
       }
       c.userSeq = newId + 1;
       String storedEmail = email.trim().toLowerCase(Locale.ROOT);
-      logActivityUnsafe(logs, c, adminId, "user_created_by_admin", "user", newId,
-          Map.of("email", storedEmail, "role", role.value()));
+      if (role == UserRole.MO) {
+        Map<String, Object> moRegPayload = new LinkedHashMap<>();
+        moRegPayload.put("email", storedEmail);
+        moRegPayload.put("role", role.value());
+        moRegPayload.put("student_id", studentId.strip());
+        moRegPayload.put("created_by_admin_id", adminId);
+        logActivityUnsafe(logs, c, newId, "register", "user", newId, moRegPayload);
+      } else {
+        logActivityUnsafe(logs, c, adminId, "user_created_by_admin", "user", newId,
+            Map.of("email", storedEmail, "role", role.value()));
+      }
       saveAll(null, null, null, null, null, logs, c);
       UserRecord fresh = requireUserUnsafe(readUsersUnsafe(), newId);
       return userOut(fresh);
@@ -302,6 +335,97 @@ public final class TaRecruitService {
     return m;
   }
 
+  /**
+   * Self-service account deletion for TA/MO. Validates password, cascades TA application data,
+   * and notifies all administrators (when notifications are enabled). MO users who still own
+   * jobs ({@code created_by}) must delete those jobs first.
+   */
+  public Map<String, Object> deleteOwnAccount(int userId, Map<String, Object> body) {
+    rw.writeLock().lock();
+    try {
+      String password = requireStr(body.get("password"), "password");
+      List<UserRecord> users = readUsersUnsafe();
+      UserRecord u = requireUserUnsafe(users, userId);
+      if ("admin".equals(u.role)) {
+        throw new ApiException(403, "管理员账号不可自行注销");
+      }
+      if (!userAccounts.passwordMatches(password, u.password_hash)) {
+        throw new ApiException(400, "密码错误");
+      }
+      List<JobRecord> jobs = readJobsUnsafe();
+      if ("mo".equals(u.role)) {
+        boolean ownsJobs = jobs.stream().anyMatch(j -> j.created_by == userId);
+        if (ownsJobs) {
+          throw new ApiException(400, "您仍拥有已创建的岗位，请先删除或处理相关岗位后再注销账号");
+        }
+      }
+
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      List<ApplicationEvaluationRecord> evals = readEvaluationsUnsafe();
+      List<NotificationRecord> notifs = readNotificationsUnsafe();
+      List<AssignmentRecord> assigns = readAssignmentsUnsafe();
+      List<JobFavoriteRecord> favs = readFavoritesUnsafe();
+      List<CvFileRecord> cvFiles = readCvFilesUnsafe();
+      List<ActivityLogRecord> logs = readLogsUnsafe();
+      Counters c = readCountersUnsafe();
+      SettingsRecord settings = readSettingsMergedUnsafe();
+
+      Set<Integer> appIds = apps.stream()
+          .filter(a -> a.ta_user_id == userId)
+          .map(a -> a.id)
+          .collect(Collectors.toSet());
+
+      for (CvFileRecord cf : cvFiles) {
+        if (cf.user_id == userId) {
+          deleteCvPayloadFileBestEffort(cf);
+        }
+      }
+
+      String email = u.email;
+      String roleLabel = "ta".equals(u.role) ? "助教" : "课程负责人";
+      String idHint = u.student_id != null && !u.student_id.isBlank() ? u.student_id : ("用户 ID " + u.id);
+      String nameHint = u.display_name != null && !u.display_name.isBlank() ? u.display_name : email;
+
+      apps.removeIf(a -> a.ta_user_id == userId);
+      evals.removeIf(e -> appIds.contains(e.application_id));
+      notifs.removeIf(n ->
+          n.user_id == userId
+              || (n.application_id != null && appIds.contains(n.application_id))
+              || (n.link_application_id != null && appIds.contains(n.link_application_id)));
+      assigns.removeIf(a -> a.ta_user_id == userId || appIds.contains(a.application_id));
+      favs.removeIf(f -> f.user_id == userId);
+      cvFiles.removeIf(f -> f.user_id == userId);
+      logs.removeIf(log ->
+          ("user".equals(log.entity_type) && log.entity_id != null && log.entity_id == userId)
+              || ("application".equals(log.entity_type) && log.entity_id != null && appIds.contains(log.entity_id)));
+
+      if (settings.notifications_enabled) {
+        notifyAdminsUnsafe(
+            notifs,
+            users,
+            settings,
+            c,
+            "用户已注销账号",
+            roleLabel + "「" + nameHint + "」已自行注销（" + idHint + "，" + email + "）。",
+            "system");
+      }
+
+      users.removeIf(x -> x.id == userId);
+      logActivityUnsafe(logs, c, userId, "account_self_deleted", "user", userId,
+          Map.of("email", email, "role", u.role));
+
+      saveAll(users, jobs, apps, notifs, assigns, logs, c);
+      saveEvaluationsUnsafe(evals);
+      saveFavoritesUnsafe(favs);
+      saveCvFilesUnsafe(cvFiles);
+      return Map.of("ok", true);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
   public Integer parseUserIdFromJwt(String bearerToken) {
     return jwt.parseUserId(bearerToken);
   }
@@ -338,11 +462,9 @@ public final class TaRecruitService {
       String qn = q != null ? q.strip().toLowerCase(Locale.ROOT) : "";
       String sk = skill != null ? skill.strip().toLowerCase(Locale.ROOT) : "";
       java.util.Set<Integer> favIds = new java.util.HashSet<>();
-      if (favoritesOnly != null && favoritesOnly) {
-        for (JobFavoriteRecord f : favs) {
-          if (f.user_id == userId) {
-            favIds.add(f.job_id);
-          }
+      for (JobFavoriteRecord f : favs) {
+        if (f.user_id == userId) {
+          favIds.add(f.job_id);
         }
       }
       List<Map<String, Object>> out = jobs.stream()
@@ -475,7 +597,31 @@ public final class TaRecruitService {
       }
       logActivityUnsafe(logs, c, user.id, "application_submitted", "application", result.id,
           Map.of("job_id", jobId));
-      saveAll(users, jobs, apps, null, null, logs, c);
+      List<NotificationRecord> notifs = null;
+      SettingsRecord settings = readSettingsMergedUnsafe();
+      if (settings.notifications_enabled && job.created_by > 0) {
+        UserRecord moOwner = users.stream().filter(u -> u.id == job.created_by).findFirst().orElse(null);
+        if (moOwner != null && "mo".equals(moOwner.role)) {
+          notifs = readNotificationsUnsafe();
+          NotificationRecord n = new NotificationRecord();
+          n.id = c.notificationSeq++;
+          n.user_id = job.created_by;
+          n.title = "新申请";
+          String taLabel = user.display_name != null && !user.display_name.isBlank()
+              ? user.display_name
+              : (user.email != null ? user.email : "TA");
+          String mod = job.module_name != null ? job.module_name : "";
+          n.body = taLabel + " 申请了岗位「" + mod + "」，可前往该岗位处理。";
+          n.application_id = result.id;
+          n.read = false;
+          n.created_at = Instant.now();
+          n.category = "application";
+          n.link_job_id = job.id;
+          n.link_application_id = result.id;
+          notifs.add(n);
+        }
+      }
+      saveAll(users, jobs, apps, notifs, null, logs, c);
       return applicationOut(apps, jobs, users, result, readEvaluationsUnsafe(), null, true);
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -488,16 +634,7 @@ public final class TaRecruitService {
     rw.readLock().lock();
     try {
       UserRecord u = requireRole(requireUserUnsafe(readUsersUnsafe(), userId), "ta");
-      Map<String, Object> m = new LinkedHashMap<>(userOut(u));
-      List<CvFileRecord> files = readCvFilesUnsafe();
-      files.stream()
-          .filter(f -> f.user_id == userId)
-          .max(Comparator.comparing(f -> f.created_at != null ? f.created_at : Instant.EPOCH))
-          .ifPresent(f -> {
-            m.put("cv_file_id", f.id);
-            m.put("cv_original_name", f.original_name);
-          });
-      return m;
+      return taProfileOut(u);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
@@ -535,12 +672,26 @@ public final class TaRecruitService {
       patchProfileStructured(user, body);
       logActivityUnsafe(logs, c, user.id, "profile_updated", "user", user.id, Map.of());
       saveAll(users, null, null, null, null, logs, c);
-      return userOut(user);
+      return taProfileOut(user);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {
       rw.writeLock().unlock();
     }
+  }
+
+  /** TA 资料 API 统一返回：含最新简历文件元数据（与 {@link #taGetProfile} 一致）。 */
+  private Map<String, Object> taProfileOut(UserRecord u) throws IOException {
+    Map<String, Object> m = new LinkedHashMap<>(userOut(u));
+    List<CvFileRecord> files = readCvFilesUnsafe();
+    files.stream()
+        .filter(f -> f.user_id == u.id)
+        .max(Comparator.comparing(f -> f.created_at != null ? f.created_at : Instant.EPOCH))
+        .ifPresent(f -> {
+          m.put("cv_file_id", f.id);
+          m.put("cv_original_name", f.original_name);
+        });
+    return m;
   }
 
   public List<Map<String, Object>> taApplications(int userId) {
@@ -607,6 +758,29 @@ public final class TaRecruitService {
           n.read = true;
         }
       }
+      saveNotifications(list);
+      return Map.of("ok", true);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
+  /** Removes one in-app notification for the user; only allowed after it is marked read. */
+  public Map<String, Object> notificationsDelete(int userId, int notificationId) {
+    rw.writeLock().lock();
+    try {
+      requireUserUnsafe(readUsersUnsafe(), userId);
+      List<NotificationRecord> list = readNotificationsUnsafe();
+      NotificationRecord row = list.stream()
+          .filter(n -> n.id == notificationId && n.user_id == userId)
+          .findFirst()
+          .orElseThrow(() -> new ApiException(404, "通知不存在"));
+      if (!row.read) {
+        throw new ApiException(400, "请先标为已读后再删除");
+      }
+      list.removeIf(n -> n.id == notificationId && n.user_id == userId);
       saveNotifications(list);
       return Map.of("ok", true);
     } catch (IOException e) {
@@ -791,7 +965,12 @@ public final class TaRecruitService {
       j.updated_at = now;
       jobs.add(j);
       logActivityUnsafe(logs, c, mo.id, "job_created", "job", j.id, Map.of("module_name", j.module_name));
-      saveAll(users, jobs, null, null, null, logs, c);
+      List<NotificationRecord> notifs = null;
+      if ("open".equals(j.status)) {
+        notifs = readNotificationsUnsafe();
+        notifyAllTasNewOpenJob(notifs, users, st, j, c);
+      }
+      saveAll(users, jobs, null, notifs, null, logs, c);
       List<ApplicationRecord> appsForCount = readApplicationsUnsafe();
       return jobOut(j, false, appsForCount);
     } catch (IOException e) {
@@ -879,6 +1058,58 @@ public final class TaRecruitService {
     }
   }
 
+  /**
+   * Permanently removes a job and cascaded rows when status is {@code closed} or {@code cancelled}.
+   * Does not delete TA CV payload files (user-scoped).
+   */
+  public Map<String, Object> moDeleteJob(int userId, int jobId) {
+    rw.writeLock().lock();
+    try {
+      List<UserRecord> users = readUsersUnsafe();
+      UserRecord mo = requireRole(requireUserUnsafe(users, userId), "mo");
+      List<JobRecord> jobs = readJobsUnsafe();
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      List<ApplicationEvaluationRecord> evals = readEvaluationsUnsafe();
+      List<NotificationRecord> notifs = readNotificationsUnsafe();
+      List<AssignmentRecord> assigns = readAssignmentsUnsafe();
+      List<JobFavoriteRecord> favs = readFavoritesUnsafe();
+      List<ActivityLogRecord> logs = readLogsUnsafe();
+      Counters c = readCountersUnsafe();
+      JobRecord job = ensureOwnJob(jobs, jobId, mo.id);
+      String st = job.status != null ? job.status : "";
+      if (!"closed".equals(st) && !"cancelled".equals(st)) {
+        throw new ApiException(400, "Only closed or cancelled jobs can be deleted");
+      }
+      String moduleName = job.module_name != null ? job.module_name : "";
+      Set<Integer> appIds = apps.stream()
+          .filter(a -> a.job_id == jobId)
+          .map(a -> a.id)
+          .collect(Collectors.toSet());
+      jobs.removeIf(j -> j.id == jobId);
+      apps.removeIf(a -> a.job_id == jobId);
+      evals.removeIf(e -> e.job_id == jobId || appIds.contains(e.application_id));
+      notifs.removeIf(n ->
+          Objects.equals(n.link_job_id, jobId)
+              || (n.application_id != null && appIds.contains(n.application_id))
+              || (n.link_application_id != null && appIds.contains(n.link_application_id)));
+      assigns.removeIf(a -> a.job_id == jobId);
+      favs.removeIf(f -> f.job_id == jobId);
+      logs.removeIf(log ->
+          ("job".equals(log.entity_type) && log.entity_id != null && log.entity_id == jobId)
+              || ("application".equals(log.entity_type) && log.entity_id != null && appIds.contains(log.entity_id)));
+      logActivityUnsafe(logs, c, mo.id, "job_deleted", "job", jobId,
+          Map.of("module_name", moduleName));
+      saveAll(users, jobs, apps, notifs, assigns, logs, c);
+      saveEvaluationsUnsafe(evals);
+      saveFavoritesUnsafe(favs);
+      return Map.of("ok", true);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
   public Map<String, Object> moTransitionJob(int userId, int jobId, Map<String, Object> body) {
     rw.writeLock().lock();
     try {
@@ -896,7 +1127,13 @@ public final class TaRecruitService {
       job.updated_at = Instant.now();
       logActivityUnsafe(logs, c, mo.id, "job_status_changed", "job", job.id,
           Map.of("to", to));
-      saveAll(users, jobs, null, null, null, logs, c);
+      List<NotificationRecord> notifs = null;
+      if ("open".equals(to)) {
+        notifs = readNotificationsUnsafe();
+        SettingsRecord st = readSettingsMergedUnsafe();
+        notifyAllTasNewOpenJob(notifs, users, st, job, c);
+      }
+      saveAll(users, jobs, null, notifs, null, logs, c);
       List<ApplicationRecord> appsForCount = readApplicationsUnsafe();
       return jobOut(job, false, appsForCount);
     } catch (IOException e) {
@@ -1733,6 +1970,7 @@ public final class TaRecruitService {
     m.put("updated_at", j.updated_at);
     m.put("quota", j.quota);
     m.put("accepted_count", acceptedCount(apps, j.id));
+    m.put("pending_applications_count", pendingApplicationsCount(apps, j.id));
     m.put("job_type", j.job_type);
     m.put("term", j.term);
     m.put("schedule_text", j.schedule_text);
@@ -1807,6 +2045,13 @@ public final class TaRecruitService {
   private static int acceptedCount(List<ApplicationRecord> apps, int jobId) {
     return (int) apps.stream()
         .filter(a -> a.job_id == jobId && "accepted".equals(a.status))
+        .count();
+  }
+
+  /** MO 待处理：状态为 pending 的申请数（用于列表气泡等）。 */
+  private static int pendingApplicationsCount(List<ApplicationRecord> apps, int jobId) {
+    return (int) apps.stream()
+        .filter(a -> a.job_id == jobId && "pending".equals(a.status))
         .count();
   }
 
@@ -2111,6 +2356,84 @@ public final class TaRecruitService {
       throw new ApiException(403, "Forbidden");
     }
     return u;
+  }
+
+  /** Append one unread in-app notification per administrator. */
+  private void notifyAdminsUnsafe(
+      List<NotificationRecord> notifs,
+      List<UserRecord> users,
+      SettingsRecord settings,
+      Counters c,
+      String title,
+      String body,
+      String category) {
+    if (!settings.notifications_enabled) {
+      return;
+    }
+    Instant now = Instant.now();
+    for (UserRecord admin : users) {
+      if (!"admin".equals(admin.role)) {
+        continue;
+      }
+      NotificationRecord n = new NotificationRecord();
+      n.id = c.notificationSeq++;
+      n.user_id = admin.id;
+      n.title = title;
+      n.body = body;
+      n.application_id = null;
+      n.read = false;
+      n.created_at = now;
+      n.category = category != null ? category : "system";
+      n.link_job_id = null;
+      n.link_application_id = null;
+      notifs.add(n);
+    }
+  }
+
+  private void deleteCvPayloadFileBestEffort(CvFileRecord f) {
+    try {
+      if (f.stored_name != null && f.stored_name.startsWith("cv_payloads/")) {
+        String tail = f.stored_name.substring("cv_payloads/".length());
+        Files.deleteIfExists(cvPayloadsDir.resolve(tail));
+      } else if (f.stored_name != null && !f.stored_name.isBlank()) {
+        Files.deleteIfExists(uploadsDir.resolve(f.stored_name));
+      }
+    } catch (IOException ignored) {
+      // best-effort cleanup
+    }
+  }
+
+  /** Fan-out to every TA when a job becomes open for applications. */
+  private void notifyAllTasNewOpenJob(
+      List<NotificationRecord> notifs,
+      List<UserRecord> users,
+      SettingsRecord settings,
+      JobRecord job,
+      Counters c) {
+    if (!settings.notifications_enabled) {
+      return;
+    }
+    String module = job.module_name != null ? job.module_name : "";
+    String deadlineHint =
+        job.deadline != null && !job.deadline.isBlank() ? " 截止日期：" + job.deadline + "。" : "";
+    Instant now = Instant.now();
+    for (UserRecord u : users) {
+      if (!"ta".equals(u.role)) {
+        continue;
+      }
+      NotificationRecord n = new NotificationRecord();
+      n.id = c.notificationSeq++;
+      n.user_id = u.id;
+      n.title = "新岗位开放申请";
+      n.body = "模块「" + module + "」已发布，可前往浏览岗位并申请。" + deadlineHint;
+      n.application_id = null;
+      n.read = false;
+      n.created_at = now;
+      n.category = "job";
+      n.link_job_id = job.id;
+      n.link_application_id = null;
+      notifs.add(n);
+    }
   }
 
   private void logActivityUnsafe(

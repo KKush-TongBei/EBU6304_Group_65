@@ -1,0 +1,48 @@
+{
+  "built_ins" : [ {
+    "id" : "lab_ta",
+    "module_name" : "Lab TA",
+    "requirements" : "Laboratory support for programming modules.",
+    "skill_tags" : "Python, Java, debugging, lab safety",
+    "assigned_hours" : 6.0,
+    "quota" : 3,
+    "job_type" : "course_ta",
+    "term" : "",
+    "schedule_text" : "As arranged by module organiser.",
+    "allow_duplicate_apply_same_type" : true
+  }, {
+    "id" : "marker",
+    "module_name" : "Exam Marker",
+    "requirements" : "Marking coursework and exams.",
+    "skill_tags" : "Attention to detail, rubric use, fairness",
+    "assigned_hours" : 8.0,
+    "quota" : 2,
+    "job_type" : "course_ta",
+    "term" : "",
+    "schedule_text" : "As arranged by module organiser.",
+    "allow_duplicate_apply_same_type" : true
+  }, {
+    "id" : "invigilator",
+    "module_name" : "Invigilator",
+    "requirements" : "Exam invigilation sessions.",
+    "skill_tags" : "Punctuality, exam regulations",
+    "assigned_hours" : 4.0,
+    "quota" : 4,
+    "job_type" : "course_ta",
+    "term" : "",
+    "schedule_text" : "As arranged by module organiser.",
+    "allow_duplicate_apply_same_type" : true
+  }, {
+    "id" : "event_support",
+    "module_name" : "Event Support",
+    "requirements" : "Open days and school events.",
+    "skill_tags" : "Communication, teamwork",
+    "assigned_hours" : 5.0,
+    "quota" : 5,
+    "job_type" : "course_ta",
+    "term" : "",
+    "schedule_text" : "As arranged by module organiser.",
+    "allow_duplicate_apply_same_type" : true
+  } ],
+  "saved" : [ ]
+}

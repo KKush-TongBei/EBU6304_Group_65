@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useBlocker, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, downloadWithAuth } from "../../api";
 import { useFeedback } from "../../feedback";
 import type { Application, Job, JobStatus } from "../../types";
@@ -107,6 +107,7 @@ function evalToDraft(e: Application["evaluation"]): EvalDraft {
 export default function MOJobDetail() {
   const { id } = useParams();
   const jobId = Number(id);
+  const nav = useNavigate();
   const { toast, confirm } = useFeedback();
   const [job, setJob] = useState<Job | null>(null);
   const [apps, setApps] = useState<Application[]>([]);
@@ -137,8 +138,6 @@ export default function MOJobDetail() {
     [editing, form]
   );
 
-  const blocker = useBlocker(dirty);
-
   useEffect(() => {
     if (!dirty) return;
     const fn = (e: BeforeUnloadEvent) => {
@@ -150,14 +149,17 @@ export default function MOJobDetail() {
 
   const loadJob = () => {
     if (!jobId) return;
-    api.mo.myJobs().then((jobs) => {
-      const j = jobs.find((x) => x.id === jobId) ?? null;
-      setJob(j);
-      if (j) {
-        setForm(jobToForm(j));
-        setTransitionTo("");
-      }
-    });
+    api.mo
+      .myJobs()
+      .then((jobs) => {
+        const j = jobs.find((x) => Number(x.id) === jobId) ?? null;
+        setJob(j);
+        if (j) {
+          setForm(jobToForm(j));
+          setTransitionTo("");
+        }
+      })
+      .catch(() => setJob(null));
   };
 
   const loadApps = () => {
@@ -239,6 +241,25 @@ export default function MOJobDetail() {
       toast("岗位已关闭", "success");
     } catch (e: unknown) {
       toast(e instanceof Error ? e.message : "操作失败", "error");
+    }
+  };
+
+  const deleteJobRecord = async () => {
+    if (!job) return;
+    const ok = await confirm({
+      title: "删除岗位记录",
+      message:
+        "将永久删除该岗位及其所有申请、评分与相关通知等本地数据，且不可恢复（不会删除申请人账号及其简历文件）。确定继续？",
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.mo.deleteJob(job.id);
+      toast("岗位记录已删除", "success");
+      nav("/mo/jobs");
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "删除失败", "error");
     }
   };
 
@@ -363,6 +384,8 @@ export default function MOJobDetail() {
 
   const nextStates = job ? allowedTransitions(job.status as JobStatus) : [];
   const canClose = job && job.status !== "closed" && job.status !== "cancelled";
+  const canDeleteRecord =
+    job && (job.status === "closed" || job.status === "cancelled");
 
   const appStats = useMemo(() => {
     const total = apps.length;
@@ -414,32 +437,6 @@ export default function MOJobDetail() {
 
   return (
     <AppShell title={job.module_name} role="mo">
-      {blocker.state === "blocked" ? (
-        <div
-          className="fixed inset-0 z-[180] flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="nav-block-title"
-        >
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full p-6 shadow-xl">
-            <h2 id="nav-block-title" className="font-display font-semibold text-lg text-ink-950 dark:text-white">
-              未保存的修改
-            </h2>
-            <p className="text-sm text-ink-600 dark:text-slate-300 mt-2">
-              离开页面将丢失正在编辑的岗位内容，是否离开？
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => blocker.reset()}>
-                继续编辑
-              </Button>
-              <Button variant="danger" onClick={() => blocker.proceed()}>
-                放弃修改
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <div className="mb-4">
         <Link to="/mo/jobs" className="text-sm text-accent hover:underline">
           ← 返回岗位列表
@@ -500,6 +497,11 @@ export default function MOJobDetail() {
             {canClose ? (
               <Button variant="danger" onClick={closeJob}>
                 关闭岗位
+              </Button>
+            ) : null}
+            {canDeleteRecord ? (
+              <Button variant="outlineDanger" onClick={deleteJobRecord} aria-label="删除岗位记录">
+                删除记录
               </Button>
             ) : null}
             {editing ? (
@@ -874,10 +876,10 @@ export default function MOJobDetail() {
                         <div className="mt-3 max-w-4xl">
                           <label className="text-xs font-semibold text-ink-600 dark:text-slate-400">总评</label>
                           <Textarea
-                            className="mt-1"
+                            className="mt-1 min-h-[5.5rem]"
                             value={evalDraft.total_note}
                             onChange={(e) => setEvalDraft({ ...evalDraft, total_note: e.target.value })}
-                            rows={2}
+                            rows={4}
                           />
                         </div>
                         <Button type="button" className="mt-3" onClick={() => saveEval(a.id)}>
