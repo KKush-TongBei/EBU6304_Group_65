@@ -767,6 +767,29 @@ public final class TaRecruitService {
     }
   }
 
+  /** Removes one in-app notification for the user; only allowed after it is marked read. */
+  public Map<String, Object> notificationsDelete(int userId, int notificationId) {
+    rw.writeLock().lock();
+    try {
+      requireUserUnsafe(readUsersUnsafe(), userId);
+      List<NotificationRecord> list = readNotificationsUnsafe();
+      NotificationRecord row = list.stream()
+          .filter(n -> n.id == notificationId && n.user_id == userId)
+          .findFirst()
+          .orElseThrow(() -> new ApiException(404, "通知不存在"));
+      if (!row.read) {
+        throw new ApiException(400, "请先标为已读后再删除");
+      }
+      list.removeIf(n -> n.id == notificationId && n.user_id == userId);
+      saveNotifications(list);
+      return Map.of("ok", true);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
   public Map<String, Object> withdrawApplication(int userId, int applicationId) {
     rw.writeLock().lock();
     try {

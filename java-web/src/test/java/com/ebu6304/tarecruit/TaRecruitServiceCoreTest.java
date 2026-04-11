@@ -222,6 +222,54 @@ class TaRecruitServiceCoreTest {
   }
 
   @Test
+  void notificationsDeleteRequiresReadThenRemoves() throws Exception {
+    List<NotificationRecord> notifs = new ArrayList<>();
+    NotificationRecord n = new NotificationRecord();
+    n.id = 1;
+    n.user_id = 3;
+    n.title = "Test";
+    n.body = "";
+    n.read = false;
+    n.created_at = Instant.now();
+    n.category = "system";
+    notifs.add(n);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("notifications.json"), notifs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.notificationSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    ApiException unread = assertThrows(ApiException.class, () -> svc.notificationsDelete(3, 1));
+    assertEquals(400, unread.status);
+
+    n.read = true;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("notifications.json"), notifs);
+    assertDoesNotThrow(() -> svc.notificationsDelete(3, 1));
+    List<NotificationRecord> after = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(after.isEmpty());
+  }
+
+  @Test
+  void notificationsDeleteWrongUserReturns404() throws Exception {
+    List<NotificationRecord> notifs = new ArrayList<>();
+    NotificationRecord n = new NotificationRecord();
+    n.id = 1;
+    n.user_id = 3;
+    n.title = "T";
+    n.body = "";
+    n.read = true;
+    n.created_at = Instant.now();
+    n.category = "system";
+    notifs.add(n);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("notifications.json"), notifs);
+
+    ApiException ex = assertThrows(ApiException.class, () -> svc.notificationsDelete(2, 1));
+    assertEquals(404, ex.status);
+  }
+
+  @Test
   void taDeleteOwnAccountNotifiesAdmin() throws Exception {
     assertDoesNotThrow(() -> svc.deleteOwnAccount(3, Map.of("password", "Ta123456")));
 
