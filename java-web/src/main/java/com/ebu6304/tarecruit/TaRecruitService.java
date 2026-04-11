@@ -462,11 +462,9 @@ public final class TaRecruitService {
       String qn = q != null ? q.strip().toLowerCase(Locale.ROOT) : "";
       String sk = skill != null ? skill.strip().toLowerCase(Locale.ROOT) : "";
       java.util.Set<Integer> favIds = new java.util.HashSet<>();
-      if (favoritesOnly != null && favoritesOnly) {
-        for (JobFavoriteRecord f : favs) {
-          if (f.user_id == userId) {
-            favIds.add(f.job_id);
-          }
+      for (JobFavoriteRecord f : favs) {
+        if (f.user_id == userId) {
+          favIds.add(f.job_id);
         }
       }
       List<Map<String, Object>> out = jobs.stream()
