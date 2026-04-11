@@ -4,7 +4,7 @@ import { api } from "../../api";
 import { useFeedback } from "../../feedback";
 import type { Notification } from "../../types";
 import AppShell from "../../AppShell";
-import { Badge, Button, Card } from "../../ui";
+import { Button, Card } from "../../ui";
 
 export default function TAHome() {
   const { toast } = useFeedback();
@@ -192,9 +192,19 @@ export default function TAHome() {
                           to={href}
                           className="block rounded-lg -mx-1 px-1 py-1 hover:bg-slate-100 dark:hover:bg-slate-800/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                         >
+                          <div className="mb-1">
+                            {n.read ? (
+                              <span className="inline-block rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                                已读
+                              </span>
+                            ) : (
+                              <span className="inline-block rounded-md bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-amber-950 dark:bg-amber-500 dark:text-amber-950">
+                                未读
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
-                            {!n.read && <Badge tone="warn">未读</Badge>}
                             {n.category ? (
                               <span className="text-xs text-ink-500 dark:text-slate-400">[{n.category}]</span>
                             ) : null}
@@ -204,9 +214,19 @@ export default function TAHome() {
                         </Link>
                       ) : (
                         <>
+                          <div className="mb-1">
+                            {n.read ? (
+                              <span className="inline-block rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                                已读
+                              </span>
+                            ) : (
+                              <span className="inline-block rounded-md bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-amber-950 dark:bg-amber-500 dark:text-amber-950">
+                                未读
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
-                            {!n.read && <Badge tone="warn">未读</Badge>}
                             {n.category ? (
                               <span className="text-xs text-ink-500 dark:text-slate-400">[{n.category}]</span>
                             ) : null}

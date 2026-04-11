@@ -94,6 +94,11 @@ export const api = {
         method: "POST",
       }),
     me: () => request<User>("/api/auth/me"),
+    deleteAccount: (password: string) =>
+      request<{ ok: boolean }>("/api/auth/delete-account", {
+        method: "POST",
+        json: { password },
+      }),
   },
   jobs: {
     list: (params: {

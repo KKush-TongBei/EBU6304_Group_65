@@ -212,7 +212,23 @@ public final class TaRecruitService {
       regPayload.put("role", role.value());
       regPayload.put("student_id", sid);
       logActivityUnsafe(logs, c, newId, "register", "user", newId, regPayload);
-      saveAll(null, null, null, null, null, logs, c);
+      List<UserRecord> usersAfterReg = readUsersUnsafe();
+      List<NotificationRecord> notifs = null;
+      SettingsRecord settings = readSettingsMergedUnsafe();
+      if (settings.notifications_enabled) {
+        notifs = readNotificationsUnsafe();
+        String roleLabel = role == UserRole.TA ? "助教" : "课程负责人";
+        String nameHint = (dn != null && !dn.isBlank()) ? dn.strip() : storedEmail;
+        notifyAdminsUnsafe(
+            notifs,
+            usersAfterReg,
+            settings,
+            c,
+            "新用户注册",
+            roleLabel + "「" + nameHint + "」已通过公开注册加入系统（学号/工号：" + sid + "，邮箱：" + storedEmail + "）。",
+            "system");
+      }
+      saveAll(null, null, null, notifs, null, logs, c);
       return tokenMap(newId);
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -317,6 +333,97 @@ public final class TaRecruitService {
     m.put("access_token", jwt.createForUserId(userId));
     m.remove("_uid");
     return m;
+  }
+
+  /**
+   * Self-service account deletion for TA/MO. Validates password, cascades TA application data,
+   * and notifies all administrators (when notifications are enabled). MO users who still own
+   * jobs ({@code created_by}) must delete those jobs first.
+   */
+  public Map<String, Object> deleteOwnAccount(int userId, Map<String, Object> body) {
+    rw.writeLock().lock();
+    try {
+      String password = requireStr(body.get("password"), "password");
+      List<UserRecord> users = readUsersUnsafe();
+      UserRecord u = requireUserUnsafe(users, userId);
+      if ("admin".equals(u.role)) {
+        throw new ApiException(403, "管理员账号不可自行注销");
+      }
+      if (!userAccounts.passwordMatches(password, u.password_hash)) {
+        throw new ApiException(400, "密码错误");
+      }
+      List<JobRecord> jobs = readJobsUnsafe();
+      if ("mo".equals(u.role)) {
+        boolean ownsJobs = jobs.stream().anyMatch(j -> j.created_by == userId);
+        if (ownsJobs) {
+          throw new ApiException(400, "您仍拥有已创建的岗位，请先删除或处理相关岗位后再注销账号");
+        }
+      }
+
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      List<ApplicationEvaluationRecord> evals = readEvaluationsUnsafe();
+      List<NotificationRecord> notifs = readNotificationsUnsafe();
+      List<AssignmentRecord> assigns = readAssignmentsUnsafe();
+      List<JobFavoriteRecord> favs = readFavoritesUnsafe();
+      List<CvFileRecord> cvFiles = readCvFilesUnsafe();
+      List<ActivityLogRecord> logs = readLogsUnsafe();
+      Counters c = readCountersUnsafe();
+      SettingsRecord settings = readSettingsMergedUnsafe();
+
+      Set<Integer> appIds = apps.stream()
+          .filter(a -> a.ta_user_id == userId)
+          .map(a -> a.id)
+          .collect(Collectors.toSet());
+
+      for (CvFileRecord cf : cvFiles) {
+        if (cf.user_id == userId) {
+          deleteCvPayloadFileBestEffort(cf);
+        }
+      }
+
+      String email = u.email;
+      String roleLabel = "ta".equals(u.role) ? "助教" : "课程负责人";
+      String idHint = u.student_id != null && !u.student_id.isBlank() ? u.student_id : ("用户 ID " + u.id);
+      String nameHint = u.display_name != null && !u.display_name.isBlank() ? u.display_name : email;
+
+      apps.removeIf(a -> a.ta_user_id == userId);
+      evals.removeIf(e -> appIds.contains(e.application_id));
+      notifs.removeIf(n ->
+          n.user_id == userId
+              || (n.application_id != null && appIds.contains(n.application_id))
+              || (n.link_application_id != null && appIds.contains(n.link_application_id)));
+      assigns.removeIf(a -> a.ta_user_id == userId || appIds.contains(a.application_id));
+      favs.removeIf(f -> f.user_id == userId);
+      cvFiles.removeIf(f -> f.user_id == userId);
+      logs.removeIf(log ->
+          ("user".equals(log.entity_type) && log.entity_id != null && log.entity_id == userId)
+              || ("application".equals(log.entity_type) && log.entity_id != null && appIds.contains(log.entity_id)));
+
+      if (settings.notifications_enabled) {
+        notifyAdminsUnsafe(
+            notifs,
+            users,
+            settings,
+            c,
+            "用户已注销账号",
+            roleLabel + "「" + nameHint + "」已自行注销（" + idHint + "，" + email + "）。",
+            "system");
+      }
+
+      users.removeIf(x -> x.id == userId);
+      logActivityUnsafe(logs, c, userId, "account_self_deleted", "user", userId,
+          Map.of("email", email, "role", u.role));
+
+      saveAll(users, jobs, apps, notifs, assigns, logs, c);
+      saveEvaluationsUnsafe(evals);
+      saveFavoritesUnsafe(favs);
+      saveCvFilesUnsafe(cvFiles);
+      return Map.of("ok", true);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
   }
 
   public Integer parseUserIdFromJwt(String bearerToken) {
@@ -492,7 +599,31 @@ public final class TaRecruitService {
       }
       logActivityUnsafe(logs, c, user.id, "application_submitted", "application", result.id,
           Map.of("job_id", jobId));
-      saveAll(users, jobs, apps, null, null, logs, c);
+      List<NotificationRecord> notifs = null;
+      SettingsRecord settings = readSettingsMergedUnsafe();
+      if (settings.notifications_enabled && job.created_by > 0) {
+        UserRecord moOwner = users.stream().filter(u -> u.id == job.created_by).findFirst().orElse(null);
+        if (moOwner != null && "mo".equals(moOwner.role)) {
+          notifs = readNotificationsUnsafe();
+          NotificationRecord n = new NotificationRecord();
+          n.id = c.notificationSeq++;
+          n.user_id = job.created_by;
+          n.title = "新申请";
+          String taLabel = user.display_name != null && !user.display_name.isBlank()
+              ? user.display_name
+              : (user.email != null ? user.email : "TA");
+          String mod = job.module_name != null ? job.module_name : "";
+          n.body = taLabel + " 申请了岗位「" + mod + "」，可前往该岗位处理。";
+          n.application_id = result.id;
+          n.read = false;
+          n.created_at = Instant.now();
+          n.category = "application";
+          n.link_job_id = job.id;
+          n.link_application_id = result.id;
+          notifs.add(n);
+        }
+      }
+      saveAll(users, jobs, apps, notifs, null, logs, c);
       return applicationOut(apps, jobs, users, result, readEvaluationsUnsafe(), null, true);
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -1818,6 +1949,7 @@ public final class TaRecruitService {
     m.put("updated_at", j.updated_at);
     m.put("quota", j.quota);
     m.put("accepted_count", acceptedCount(apps, j.id));
+    m.put("pending_applications_count", pendingApplicationsCount(apps, j.id));
     m.put("job_type", j.job_type);
     m.put("term", j.term);
     m.put("schedule_text", j.schedule_text);
@@ -1892,6 +2024,13 @@ public final class TaRecruitService {
   private static int acceptedCount(List<ApplicationRecord> apps, int jobId) {
     return (int) apps.stream()
         .filter(a -> a.job_id == jobId && "accepted".equals(a.status))
+        .count();
+  }
+
+  /** MO 待处理：状态为 pending 的申请数（用于列表气泡等）。 */
+  private static int pendingApplicationsCount(List<ApplicationRecord> apps, int jobId) {
+    return (int) apps.stream()
+        .filter(a -> a.job_id == jobId && "pending".equals(a.status))
         .count();
   }
 
@@ -2196,6 +2335,51 @@ public final class TaRecruitService {
       throw new ApiException(403, "Forbidden");
     }
     return u;
+  }
+
+  /** Append one unread in-app notification per administrator. */
+  private void notifyAdminsUnsafe(
+      List<NotificationRecord> notifs,
+      List<UserRecord> users,
+      SettingsRecord settings,
+      Counters c,
+      String title,
+      String body,
+      String category) {
+    if (!settings.notifications_enabled) {
+      return;
+    }
+    Instant now = Instant.now();
+    for (UserRecord admin : users) {
+      if (!"admin".equals(admin.role)) {
+        continue;
+      }
+      NotificationRecord n = new NotificationRecord();
+      n.id = c.notificationSeq++;
+      n.user_id = admin.id;
+      n.title = title;
+      n.body = body;
+      n.application_id = null;
+      n.read = false;
+      n.created_at = now;
+      n.category = category != null ? category : "system";
+      n.link_job_id = null;
+      n.link_application_id = null;
+      notifs.add(n);
+    }
+  }
+
+  private void deleteCvPayloadFileBestEffort(CvFileRecord f) {
+    try {
+      if (f.stored_name != null && f.stored_name.startsWith("cv_payloads/")) {
+        String tail = f.stored_name.substring("cv_payloads/".length());
+        Files.deleteIfExists(cvPayloadsDir.resolve(tail));
+      } else if (f.stored_name != null && !f.stored_name.isBlank()) {
+        Files.deleteIfExists(uploadsDir.resolve(f.stored_name));
+      }
+    } catch (IOException ignored) {
+      // best-effort cleanup
+    }
   }
 
   /** Fan-out to every TA when a job becomes open for applications. */

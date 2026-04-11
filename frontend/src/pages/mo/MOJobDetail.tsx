@@ -876,10 +876,10 @@ export default function MOJobDetail() {
                         <div className="mt-3 max-w-4xl">
                           <label className="text-xs font-semibold text-ink-600 dark:text-slate-400">总评</label>
                           <Textarea
-                            className="mt-1"
+                            className="mt-1 min-h-[5.5rem]"
                             value={evalDraft.total_note}
                             onChange={(e) => setEvalDraft({ ...evalDraft, total_note: e.target.value })}
-                            rows={2}
+                            rows={4}
                           />
                         </div>
                         <Button type="button" className="mt-3" onClick={() => saveEval(a.id)}>

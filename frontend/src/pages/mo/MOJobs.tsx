@@ -55,7 +55,18 @@ export default function MOJobs() {
               <Card className="p-5 hover:shadow-md transition cursor-pointer">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-ink-950 dark:text-white">{j.module_name}</h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-ink-950 dark:text-white">{j.module_name}</h3>
+                      {(j.pending_applications_count ?? 0) > 0 ? (
+                        <span
+                          className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold shadow-sm tabular-nums"
+                          title="待处理申请（未推进流程）"
+                          aria-label={`${j.pending_applications_count} 条待处理申请`}
+                        >
+                          {j.pending_applications_count}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="text-xs text-ink-500 dark:text-slate-400 mt-1">
                       截止 {j.deadline || "—"} · {j.assigned_hours}h/人 · 名额 {j.accepted_count ?? 0}/{j.quota ?? 1}
                     </p>
