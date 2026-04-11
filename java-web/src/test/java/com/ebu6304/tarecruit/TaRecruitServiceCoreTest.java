@@ -387,6 +387,32 @@ class TaRecruitServiceCoreTest {
   }
 
   @Test
+  void taListJobsMarksFavoritedWhenNotUsingFavoritesOnlyFilter() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "FavStar";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.deadline = "";
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    assertDoesNotThrow(() -> svc.taToggleFavorite(3, 1));
+    Map<String, Object> row = svc.listJobs(3, null, null, "open", null, false, null).stream()
+        .filter(m -> m.get("id").equals(1))
+        .findFirst()
+        .orElseThrow();
+    assertEquals(true, row.get("favorited"));
+  }
+
+  @Test
   void moListJobsKeepsTrueStatusWhenDeadlinePassed() throws Exception {
     List<JobRecord> jobs = new ArrayList<>();
     JobRecord j = new JobRecord();
