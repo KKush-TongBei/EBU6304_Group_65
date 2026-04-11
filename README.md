@@ -78,6 +78,8 @@ mvn package
 
 生产环境请设置 **`TA_JWT_SECRET`**（或 `SECRET_KEY`）为足够长的随机串；亦可于 `java-web/src/main/webapp/WEB-INF/web.xml` 的 `secretKey` 上下文参数中配置（留空则使用内置默认值，仅适合本地）。变量名示例见根目录 [`.env.example`](.env.example)。
 
+**组内多台电脑同步用户与业务数据：** `java-web/data/` 下的 **`*.json`** 已配置为可由 Git 跟踪（`uploads/`、`cv_payloads/` 仍忽略，避免大文件与简历原文进库）。新建用户或改数据后请 **`git add` + `commit` + `push`**，其他成员 **`git pull`** 后即可一致。删除用户记录目前需**手动编辑 `users.json`** 或后续扩展「管理员删除 / 用户注销」接口；**换电脑本身不会清空数据**，只要仓库里已有提交。
+
 ### 3. 前端嵌入 WAR（同源 `/api`）
 
 ```bash

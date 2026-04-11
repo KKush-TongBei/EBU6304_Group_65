@@ -1,2 +1,4 @@
 /target/
-/data/
+# 组内共享：跟踪 data 下 JSON；上传与简历原文体积大且可能含隐私，不入库
+/data/uploads/
+/data/cv_payloads/
