@@ -108,9 +108,9 @@ export interface WorkloadRow {
   ta_user_id: number;
   display_name: string;
   email: string;
-  total_hours: number;
+  /** Sum of weekly hours (h/week) across active applications per TA */
+  weekly_hours: number;
   overloaded: boolean;
-  weekly_over_20?: boolean;
 }
 
 export interface ActivityLog {

@@ -49,4 +49,38 @@
   "schedule_text" : "As arranged by module organiser.",
   "allow_duplicate_apply_same_type" : true,
   "deadline_notification_sent" : false
+}, {
+  "id" : 6,
+  "module_name" : "Lab TA",
+  "requirements" : "Laboratory support for programming modules.",
+  "deadline" : "",
+  "skill_tags" : "Python, Java, debugging, lab safety",
+  "status" : "open",
+  "assigned_hours" : 18.0,
+  "created_by" : 4,
+  "updated_at" : "2026-04-11T14:16:25.795192Z",
+  "created_at" : "2026-04-11T14:16:25.795192Z",
+  "quota" : 3,
+  "job_type" : "course_ta",
+  "term" : "",
+  "schedule_text" : "As arranged by module organiser.",
+  "allow_duplicate_apply_same_type" : true,
+  "deadline_notification_sent" : false
+}, {
+  "id" : 7,
+  "module_name" : "Event Support",
+  "requirements" : "Open days and school events.",
+  "deadline" : "",
+  "skill_tags" : "Communication, teamwork",
+  "status" : "open",
+  "assigned_hours" : 8.0,
+  "created_by" : 3,
+  "updated_at" : "2026-04-11T14:18:35.369555Z",
+  "created_at" : "2026-04-11T14:18:35.369555Z",
+  "quota" : 5,
+  "job_type" : "course_ta",
+  "term" : "",
+  "schedule_text" : "As arranged by module organiser.",
+  "allow_duplicate_apply_same_type" : true,
+  "deadline_notification_sent" : false
 } ]

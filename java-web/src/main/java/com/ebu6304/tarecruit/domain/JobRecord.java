@@ -13,6 +13,7 @@ public final class JobRecord {
   public String skill_tags = "";
   /** draft | open | screening | interview | shortlist | filled | closed | cancelled */
   public String status = "open";
+  /** Weekly workload for this slot (hours per week); summed for TA capacity checks. */
   public double assigned_hours = 5.0;
   public int created_by;
   public Instant updated_at;
