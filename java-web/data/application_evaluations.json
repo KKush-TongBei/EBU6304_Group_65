@@ -1,1 +1,15 @@
-[ ]
+[ {
+  "id" : 1,
+  "application_id" : 1,
+  "job_id" : 4,
+  "skill_match" : 0,
+  "course_experience" : 0,
+  "academic_background" : 0,
+  "availability_score" : 0,
+  "communication" : 0,
+  "total_note" : "99",
+  "label" : "",
+  "decision_note" : "",
+  "updated_by" : 3,
+  "updated_at" : "2026-04-11T06:49:10.662132Z"
+} ]
