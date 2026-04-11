@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
+import { useAuth } from "../../AuthContext";
 import { useFeedback } from "../../feedback";
 import type { Application, ApplicationStatus, Job, JobStatus } from "../../types";
 import AppShell from "../../AppShell";
@@ -10,6 +11,31 @@ function jobAcceptingApplications(status: JobStatus): boolean {
 }
 
 type JobListScope = "open" | "closed";
+
+/** Sum weekly hours from applications in pending / interviewing / accepted (matches backend workload). */
+function weeklyHoursFromActiveApps(apps: Application[]): number {
+  let sum = 0;
+  for (const a of apps) {
+    if (a.status !== "pending" && a.status !== "interviewing" && a.status !== "accepted") {
+      continue;
+    }
+    sum += a.job?.assigned_hours ?? 0;
+  }
+  return sum;
+}
+
+/** Weekly hours if this job were active: if already counted in active apps, no extra add. */
+function projectedWeeklyHoursAfterApply(apps: Application[], job: Job): number {
+  const base = weeklyHoursFromActiveApps(apps);
+  const app = apps.find((x) => x.job_id === job.id);
+  if (
+    app &&
+    (app.status === "pending" || app.status === "interviewing" || app.status === "accepted")
+  ) {
+    return base;
+  }
+  return base + job.assigned_hours;
+}
 
 function applicationSummary(status: ApplicationStatus | undefined): string {
   if (!status) return "尚未申请";
@@ -29,6 +55,7 @@ function applicationSummary(status: ApplicationStatus | undefined): string {
 
 export default function TAJobs() {
   const { toast } = useFeedback();
+  const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [apps, setApps] = useState<Application[]>([]);
   const [q, setQ] = useState("");
@@ -157,7 +184,7 @@ export default function TAJobs() {
                 <option value="">默认（最新发布）</option>
                 <option value="deadline">截止日</option>
                 <option value="created_at">发布时间</option>
-                <option value="assigned_hours">预估工时（低→高）</option>
+                <option value="assigned_hours">预估每周工时（低→高）</option>
                 <option value="quota">招聘名额（少→多）</option>
               </Select>
             </div>
@@ -196,6 +223,12 @@ export default function TAJobs() {
             const existing = appByJob.get(j.id);
             const showApply = !existing || existing.status === "withdrawn";
             const canApply = showApply && jobAcceptingApplications(j.status);
+            const maxWeekly = user?.max_weekly_hours ?? 0;
+            const projected = projectedWeeklyHoursAfterApply(apps, j);
+            const wouldExceedSelfCap =
+              maxWeekly > 0 &&
+              projected > maxWeekly &&
+              existing?.status !== "accepted";
             return (
               <Card key={j.id} className="p-5 hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
                 <div className="flex flex-wrap justify-between gap-3">
@@ -214,7 +247,7 @@ export default function TAJobs() {
                       </Button>
                     </div>
                     <p className="text-xs text-ink-500 dark:text-slate-400 mt-1">
-                      截止 {j.deadline || "—"} · 预估工时 {j.assigned_hours}h · 名额 {j.accepted_count ?? 0}/{j.quota ?? 1} ·{" "}
+                      截止 {j.deadline || "—"} · 预估每周工时 {j.assigned_hours} 工时/周 · 名额 {j.accepted_count ?? 0}/{j.quota ?? 1} ·{" "}
                       <StatusBadge status={j.status as JobStatus} />
                     </p>
                     {j.term ? (
@@ -222,7 +255,15 @@ export default function TAJobs() {
                     ) : null}
                     <p className="text-sm text-ink-600 dark:text-slate-300 mt-2">{applicationSummary(existing?.status)}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col items-end gap-1 max-w-[11rem] text-right">
+                    {wouldExceedSelfCap ? (
+                      <span
+                        className="text-xs font-semibold text-red-800 dark:text-red-100 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 px-2 py-1 rounded-lg"
+                        title={`当前已计每周约 ${weeklyHoursFromActiveApps(apps).toFixed(1)} 工时/周，若计入本岗位约 ${projected.toFixed(1)} 工时/周，超过您在资料中设置的 ${maxWeekly} 工时/周`}
+                      >
+                        录用将超负荷
+                      </span>
+                    ) : null}
                     {existing && <StatusBadge status={existing.status} />}
                   </div>
                 </div>

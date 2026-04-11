@@ -276,4 +276,254 @@
     "email" : "kushhhhhhhhhh@icloud.com"
   },
   "created_at" : "2026-04-11T07:01:32.573035Z"
+}, {
+  "id" : 33,
+  "actor_user_id" : 1,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T11:57:32.510707Z"
+}, {
+  "id" : 34,
+  "actor_user_id" : 4,
+  "action" : "register",
+  "entity_type" : "user",
+  "entity_id" : 4,
+  "payload" : {
+    "email" : "zhangyixuan050601@outlook.com",
+    "role" : "mo",
+    "student_id" : "1234567890"
+  },
+  "created_at" : "2026-04-11T14:14:57.003951Z"
+}, {
+  "id" : 35,
+  "actor_user_id" : 4,
+  "action" : "job_created",
+  "entity_type" : "job",
+  "entity_id" : 6,
+  "payload" : {
+    "module_name" : "Lab TA"
+  },
+  "created_at" : "2026-04-11T14:16:25.795214Z"
+}, {
+  "id" : 36,
+  "actor_user_id" : 3,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 3,
+  "payload" : {
+    "email" : "kushhhhhhhhhh@icloud.com"
+  },
+  "created_at" : "2026-04-11T14:18:06.219887Z"
+}, {
+  "id" : 37,
+  "actor_user_id" : 3,
+  "action" : "job_created",
+  "entity_type" : "job",
+  "entity_id" : 7,
+  "payload" : {
+    "module_name" : "Event Support"
+  },
+  "created_at" : "2026-04-11T14:18:35.369566Z"
+}, {
+  "id" : 38,
+  "actor_user_id" : 2,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T14:19:31.761810Z"
+}, {
+  "id" : 39,
+  "actor_user_id" : 2,
+  "action" : "application_submitted",
+  "entity_type" : "application",
+  "entity_id" : 3,
+  "payload" : {
+    "job_id" : 6
+  },
+  "created_at" : "2026-04-11T14:20:07.001611Z"
+}, {
+  "id" : 40,
+  "actor_user_id" : 3,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 3,
+  "payload" : {
+    "email" : "kushhhhhhhhhh@icloud.com"
+  },
+  "created_at" : "2026-04-11T14:20:34.682726Z"
+}, {
+  "id" : 41,
+  "actor_user_id" : 3,
+  "action" : "application_interviewing",
+  "entity_type" : "application",
+  "entity_id" : 2,
+  "payload" : {
+    "job_id" : 5,
+    "ta_id" : 2,
+    "decision" : "interviewing"
+  },
+  "created_at" : "2026-04-11T14:21:07.235278Z"
+}, {
+  "id" : 42,
+  "actor_user_id" : 3,
+  "action" : "application_accepted",
+  "entity_type" : "application",
+  "entity_id" : 2,
+  "payload" : {
+    "job_id" : 5,
+    "ta_id" : 2,
+    "decision" : "accepted"
+  },
+  "created_at" : "2026-04-11T14:21:09.704460Z"
+}, {
+  "id" : 43,
+  "actor_user_id" : 4,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 4,
+  "payload" : {
+    "email" : "zhangyixuan050601@outlook.com"
+  },
+  "created_at" : "2026-04-11T14:21:50.606066Z"
+}, {
+  "id" : 44,
+  "actor_user_id" : 4,
+  "action" : "application_interviewing",
+  "entity_type" : "application",
+  "entity_id" : 3,
+  "payload" : {
+    "job_id" : 6,
+    "ta_id" : 2,
+    "decision" : "interviewing"
+  },
+  "created_at" : "2026-04-11T14:22:06.795312Z"
+}, {
+  "id" : 45,
+  "actor_user_id" : 4,
+  "action" : "application_accepted",
+  "entity_type" : "application",
+  "entity_id" : 3,
+  "payload" : {
+    "job_id" : 6,
+    "ta_id" : 2,
+    "decision" : "accepted"
+  },
+  "created_at" : "2026-04-11T14:22:11.648518Z"
+}, {
+  "id" : 46,
+  "actor_user_id" : 1,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T14:22:29.709347Z"
+}, {
+  "id" : 47,
+  "actor_user_id" : 2,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T14:30:40.153477Z"
+}, {
+  "id" : 48,
+  "actor_user_id" : 1,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T14:35:27.443067Z"
+}, {
+  "id" : 49,
+  "actor_user_id" : 2,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T14:49:43.570565Z"
+}, {
+  "id" : 50,
+  "actor_user_id" : 1,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T15:57:47.851296Z"
+}, {
+  "id" : 51,
+  "actor_user_id" : 2,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T16:03:07.183283Z"
+}, {
+  "id" : 52,
+  "actor_user_id" : 1,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T16:11:30.713613Z"
+}, {
+  "id" : 53,
+  "actor_user_id" : 2,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 2,
+  "payload" : {
+    "email" : "1843025356@qq.com"
+  },
+  "created_at" : "2026-04-11T16:12:48.856577Z"
+}, {
+  "id" : 54,
+  "actor_user_id" : 2,
+  "action" : "application_submitted",
+  "entity_type" : "application",
+  "entity_id" : 4,
+  "payload" : {
+    "job_id" : 7
+  },
+  "created_at" : "2026-04-11T16:17:22.829622Z"
+}, {
+  "id" : 55,
+  "actor_user_id" : 2,
+  "action" : "application_withdrawn",
+  "entity_type" : "application",
+  "entity_id" : 4,
+  "payload" : {
+    "job_id" : 7
+  },
+  "created_at" : "2026-04-11T16:17:29.813105Z"
+}, {
+  "id" : 56,
+  "actor_user_id" : 1,
+  "action" : "login",
+  "entity_type" : "user",
+  "entity_id" : 1,
+  "payload" : {
+    "email" : "zyx1678162910@gmail.com"
+  },
+  "created_at" : "2026-04-11T16:24:46.110118Z"
 } ]

@@ -225,7 +225,7 @@ export default function TAProfile() {
           </div>
           <div>
             <label htmlFor="pf-maxh" className="text-xs font-semibold text-ink-700 dark:text-slate-300">
-              每周可承担最大工时（0 表示未设置）
+              每周可承担最大工时（工时/周，0 表示未设置）
             </label>
             <Input
               id="pf-maxh"

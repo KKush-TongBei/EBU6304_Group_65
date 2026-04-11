@@ -19,6 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -104,7 +105,7 @@ class TaRecruitServiceCoreTest {
   @Test
   void registerRejectsNonTaRole() {
     Map<String, Object> body = new LinkedHashMap<>();
-    body.put("email", "x@y.z");
+    body.put("email", "x@y.zz");
     body.put("password", "Abcd1234");
     body.put("student_id", "2025999");
     body.put("role", "admin");
@@ -345,7 +346,7 @@ class TaRecruitServiceCoreTest {
   }
 
   @Test
-  void adminWorkloadCountsActiveApplicationsAndOver20Warning() throws Exception {
+  void adminWorkloadCountsActiveApplicationsAndOverloadByWeeklyHours() throws Exception {
     List<JobRecord> jobs = new ArrayList<>();
     JobRecord j1 = new JobRecord();
     j1.id = 1;
@@ -397,9 +398,8 @@ class TaRecruitServiceCoreTest {
         .filter(r -> ((Number) r.get("ta_user_id")).intValue() == 3)
         .findFirst()
         .orElseThrow();
-    assertEquals(22.0, ((Number) row.get("total_hours")).doubleValue(), 0.0001);
+    assertEquals(22.0, ((Number) row.get("weekly_hours")).doubleValue(), 0.0001);
     assertEquals(true, row.get("overloaded"));
-    assertEquals(true, row.get("weekly_over_20"));
   }
 
   @Test
@@ -608,6 +608,43 @@ class TaRecruitServiceCoreTest {
   }
 
   @Test
+  void acceptWhenWeeklyHoursExceedThresholdDoesNotSendWorkloadAlertToTa() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "HeavyLoad";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 2;
+    j.assigned_hours = 25.0;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    Map<String, Object> app = svc.applyJob(3, 1);
+    int appId = ((Number) app.get("id")).intValue();
+
+    assertDoesNotThrow(() -> svc.moDecideApplication(2, appId, Map.of("status", "interviewing")));
+    @SuppressWarnings("unchecked")
+    Map<String, Object> accepted = svc.moDecideApplication(2, appId, Map.of("status", "accepted"));
+    @SuppressWarnings("unchecked")
+    List<String> moWarnings = (List<String>) accepted.get("warnings");
+    assertTrue(moWarnings != null && moWarnings.stream().noneMatch(w -> w.startsWith("Overloaded")));
+    assertTrue(moWarnings != null && moWarnings.contains("SafeToAssign"));
+
+    List<NotificationRecord> notifs = AtomicJsonFile.readList(
+        dataDir.resolve("notifications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(notifs.stream().noneMatch(
+        n -> n.user_id == 3 && "workload_alert".equals(n.category)));
+  }
+
+  @Test
   void moDeleteJobRemovesJobAndCascadeWhenClosedOrCancelled() throws Exception {
     List<JobRecord> jobs = new ArrayList<>();
     JobRecord j = new JobRecord();
@@ -809,5 +846,108 @@ class TaRecruitServiceCoreTest {
         new com.fasterxml.jackson.core.type.TypeReference<List<NotificationRecord>>() {},
         new ArrayList<>());
     assertTrue(notifs.stream().anyMatch(n -> n.user_id == 3 && "job".equals(n.category) && n.link_job_id == 1));
+  }
+
+  @Test
+  void adminDashboardCountsByRole() {
+    Map<String, Object> d = svc.adminDashboard(1);
+    assertEquals(1L, ((Number) d.get("ta_count")).longValue());
+    assertEquals(1L, ((Number) d.get("mo_count")).longValue());
+    assertEquals(1L, ((Number) d.get("admin_count")).longValue());
+    assertEquals(2L, ((Number) d.get("mo_ta_count")).longValue());
+    assertEquals(3L, ((Number) d.get("total_user_count")).longValue());
+  }
+
+  @Test
+  void loginLocksAfterThreeFailuresAnd423WhileLocked() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "ta@test.edu");
+    body.put("password", "wrong");
+    for (int i = 0; i < 3; i++) {
+      assertThrows(ApiException.class, () -> svc.login(body));
+    }
+    List<UserRecord> users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    UserRecord ta = users.stream().filter(u -> u.id == 3).findFirst().orElseThrow();
+    assertEquals(1, ta.lockout_count);
+    assertEquals(0, ta.failed_login_attempts);
+    assertTrue(ta.locked_until != null && ta.locked_until.isAfter(Instant.now()));
+
+    ApiException locked = assertThrows(ApiException.class, () -> svc.login(body));
+    assertEquals(423, locked.status);
+
+    ta.locked_until = Instant.now().minusSeconds(1);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("users.json"), users);
+
+    Map<String, Object> ok = new LinkedHashMap<>();
+    ok.put("email", "ta@test.edu");
+    ok.put("password", "Ta123456");
+    assertDoesNotThrow(() -> svc.login(ok));
+    users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    ta = users.stream().filter(u -> u.id == 3).findFirst().orElseThrow();
+    assertEquals(0, ta.lockout_count);
+    assertEquals(0, ta.failed_login_attempts);
+    assertTrue(ta.locked_until == null);
+  }
+
+  @Test
+  void secondLockoutUsesLongerWindowThanFirst() throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "ta@test.edu");
+    body.put("password", "wrong");
+    for (int i = 0; i < 3; i++) {
+      assertThrows(ApiException.class, () -> svc.login(body));
+    }
+    List<UserRecord> users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    UserRecord ta = users.stream().filter(u -> u.id == 3).findFirst().orElseThrow();
+    long dur1 = ChronoUnit.MINUTES.between(Instant.now(), ta.locked_until);
+    assertTrue(dur1 >= 4 && dur1 <= 6);
+
+    ta.locked_until = Instant.now().minusSeconds(1);
+    ta.failed_login_attempts = 0;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("users.json"), users);
+
+    for (int i = 0; i < 3; i++) {
+      assertThrows(ApiException.class, () -> svc.login(body));
+    }
+    users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    ta = users.stream().filter(u -> u.id == 3).findFirst().orElseThrow();
+    assertEquals(2, ta.lockout_count);
+    long dur2 = ChronoUnit.MINUTES.between(Instant.now(), ta.locked_until);
+    assertTrue(dur2 >= 9 && dur2 <= 11);
+    assertTrue(dur2 > dur1 + 3);
+  }
+
+  @Test
+  void registerRejectsInvalidEmail() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "not-an-email");
+    body.put("password", "Abcd1234");
+    body.put("student_id", "2025999");
+    body.put("role", "TA");
+    ApiException ex = assertThrows(ApiException.class, () -> svc.register(body));
+    assertEquals(422, ex.status);
+  }
+
+  @Test
+  void registerRejectsOverlongEmail() {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("email", "a".repeat(256) + "@x.co");
+    body.put("password", "Abcd1234");
+    body.put("student_id", "2025999");
+    body.put("role", "TA");
+    ApiException ex = assertThrows(ApiException.class, () -> svc.register(body));
+    assertEquals(422, ex.status);
   }
 }

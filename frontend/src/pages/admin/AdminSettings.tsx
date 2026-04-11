@@ -53,13 +53,13 @@ export default function AdminSettings() {
       ) : (
         <Card className="p-6 max-w-lg">
           <form onSubmit={save} className="space-y-3">
-            <label className="block text-xs font-semibold text-ink-700 dark:text-slate-300">默认最大工时</label>
+            <label className="block text-xs font-semibold text-ink-700 dark:text-slate-300">默认最大每周工时（工时/周）</label>
             <Input
               type="number"
               value={s.max_ta_hours_default}
               onChange={(e) => setS({ ...s, max_ta_hours_default: Number(e.target.value) })}
             />
-            <label className="block text-xs font-semibold text-ink-700 dark:text-slate-300">超载阈值（小时）</label>
+            <label className="block text-xs font-semibold text-ink-700 dark:text-slate-300">超负荷阈值（工时/周）</label>
             <Input
               type="number"
               value={s.overload_threshold_hours}
