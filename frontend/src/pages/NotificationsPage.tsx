@@ -47,6 +47,16 @@ export default function NotificationsPage({ role }: { role: UserRole }) {
     });
   };
 
+  const deleteOne = (id: number) => {
+    api.notifications
+      .delete(id)
+      .then(() => {
+        setNotes((prev) => prev.filter((n) => n.id !== id));
+        toast("已删除", "success");
+      })
+      .catch((e: unknown) => toast(e instanceof Error ? e.message : "删除失败", "error"));
+  };
+
   const notifLink = (n: Notification) => {
     if (role === "ta") {
       if (n.link_application_id != null) return "/ta/applications";
@@ -134,11 +144,22 @@ export default function NotificationsPage({ role }: { role: UserRole }) {
                         </>
                       )}
                     </div>
-                    {!n.read && (
-                      <Button variant="ghost" className="!py-1 !px-2 text-xs shrink-0" onClick={() => markOne(n.id)}>
-                        标已读
-                      </Button>
-                    )}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {!n.read && (
+                        <Button variant="ghost" className="!py-1 !px-2 text-xs" onClick={() => markOne(n.id)}>
+                          标已读
+                        </Button>
+                      )}
+                      {n.read && (
+                        <Button
+                          variant="ghost"
+                          className="!py-1 !px-2 text-xs text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          onClick={() => deleteOne(n.id)}
+                        >
+                          删除
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </li>
               );
