@@ -602,12 +602,21 @@ export default function MOJobDetail() {
               aria-label="工作时段"
               rows={2}
             />
-            <Input
-              type="number"
-              value={form.assigned_hours}
-              onChange={(e) => setForm({ ...form, assigned_hours: Number(e.target.value) })}
-              aria-label="工时"
-            />
+            <div>
+              <label htmlFor="job-assigned-hours" className="text-xs font-semibold text-ink-700 dark:text-slate-300">
+                每周工时（工时/周）
+              </label>
+              <Input
+                id="job-assigned-hours"
+                type="number"
+                min={0}
+                step={0.5}
+                className="mt-1"
+                value={form.assigned_hours}
+                onChange={(e) => setForm({ ...form, assigned_hours: Number(e.target.value) })}
+                aria-label="每周工时（工时/周）"
+              />
+            </div>
             <label className="flex items-center gap-2 text-sm text-ink-800 dark:text-slate-200">
               <input
                 type="checkbox"
@@ -621,7 +630,7 @@ export default function MOJobDetail() {
           <>
             <p className="text-sm text-ink-600 dark:text-slate-300 whitespace-pre-wrap">{job.requirements}</p>
             <p className="text-xs text-ink-500 dark:text-slate-400 mt-3">
-              截止 {job.deadline} · 标签 {job.skill_tags} · 工时 {job.assigned_hours}h
+              截止 {job.deadline} · 标签 {job.skill_tags} · 每周工时 {job.assigned_hours} 工时/周
             </p>
             {job.schedule_text ? (
               <p className="text-xs text-ink-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { notificationCategoryLabel, notificationRiskStyle } from "../notificationLabels";
 import { useFeedback } from "../feedback";
 import type { Notification } from "../types";
 import type { UserRole } from "../types";
@@ -59,8 +60,15 @@ export default function NotificationsPage({ role }: { role: UserRole }) {
 
   const notifLink = (n: Notification) => {
     if (role === "ta") {
-      if (n.link_application_id != null) return "/ta/applications";
-      if (n.link_job_id != null) return "/ta/jobs";
+      if (n.category === "workload_alert" && n.link_job_id != null) {
+        return "/ta/jobs";
+      }
+      if (n.link_application_id != null) {
+        return "/ta/applications";
+      }
+      if (n.link_job_id != null) {
+        return "/ta/jobs";
+      }
     }
     if (role === "mo") {
       if (n.link_job_id != null) return `/mo/jobs/${n.link_job_id}`;
@@ -101,7 +109,7 @@ export default function NotificationsPage({ role }: { role: UserRole }) {
           <ul className="space-y-4">
             {notes.map((n) => {
               const href = notifLink(n);
-              const risk = n.category === "decision" || n.category === "workload_alert";
+              const risk = notificationRiskStyle(n.category);
               return (
                 <li
                   key={n.id}
@@ -129,7 +137,9 @@ export default function NotificationsPage({ role }: { role: UserRole }) {
                         >
                           <span className="font-semibold text-ink-900 dark:text-slate-100">{n.title}</span>
                           {n.category ? (
-                            <span className="text-xs text-ink-500 dark:text-slate-400 ml-2">[{n.category}]</span>
+                            <span className="text-xs text-ink-500 dark:text-slate-400 ml-2">
+                              [{notificationCategoryLabel(n.category)}]
+                            </span>
                           ) : null}
                           <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
                           <span className="text-accent text-xs mt-2 inline-block">点击进入相关页面 →</span>
@@ -138,7 +148,9 @@ export default function NotificationsPage({ role }: { role: UserRole }) {
                         <>
                           <span className="font-semibold text-ink-900 dark:text-slate-100">{n.title}</span>
                           {n.category ? (
-                            <span className="text-xs text-ink-500 dark:text-slate-400 ml-2">[{n.category}]</span>
+                            <span className="text-xs text-ink-500 dark:text-slate-400 ml-2">
+                              [{notificationCategoryLabel(n.category)}]
+                            </span>
                           ) : null}
                           <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
                         </>

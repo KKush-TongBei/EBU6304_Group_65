@@ -196,7 +196,7 @@ export default function MOPost() {
           </div>
           <div>
             <label htmlFor="post-hours" className="text-xs font-semibold text-ink-700 dark:text-slate-300">
-              录用后计入工时（小时）
+              录用后每周工时（工时/周）
             </label>
             <Input
               id="post-hours"

@@ -14,6 +14,7 @@ public final class SettingsRecord {
   public String term_start = "";
   public String term_end = "";
   public List<String> skill_dictionary = new ArrayList<>();
+  /** Max recommended weekly hours per TA before overload (same unit as job assigned_hours). */
   public double overload_threshold_hours = 20.0;
   /** Default quota when MO omits quota on new jobs */
   public int default_job_quota = 1;

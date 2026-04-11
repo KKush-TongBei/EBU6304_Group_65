@@ -10,6 +10,7 @@ public final class AssignmentRecord {
   public int ta_user_id;
   public int job_id;
   public int application_id;
+  /** Weekly hours for this assignment (same semantics as {@link JobRecord#assigned_hours}). */
   public double assigned_hours;
   public String term = "2025-2026-1";
   public Instant created_at;

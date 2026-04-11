@@ -19,6 +19,8 @@ public final class UserRecord {
   public Instant created_at;
   public int failed_login_attempts = 0;
   public Instant locked_until;
+  /** Incremented each time an account is locked after repeated failed logins; drives escalating lock duration. */
+  public int lockout_count = 0;
   /** Structured profile (TA) */
   public List<String> profile_skills = new ArrayList<>();
   public String preferred_courses = "";

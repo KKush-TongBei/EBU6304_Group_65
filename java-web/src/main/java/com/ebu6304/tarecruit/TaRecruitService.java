@@ -1,6 +1,7 @@
 package com.ebu6304.tarecruit;
 
 import com.ebu6304.tarecruit.api.ApiException;
+import com.ebu6304.tarecruit.api.InputValidation;
 import com.ebu6304.tarecruit.auth.JwtHelper;
 import com.ebu6304.tarecruit.domain.ActivityLogRecord;
 import com.ebu6304.tarecruit.domain.ApplicationEvaluationRecord;
@@ -63,8 +64,20 @@ public final class TaRecruitService {
   private final ReentrantReadWriteLock rw = new ReentrantReadWriteLock();
 
   private static final Set<String> RECRUITING = Set.of("open", "screening", "interview", "shortlist");
-  private static final int MAX_LOGIN_FAILS = 5;
-  private static final int LOCKOUT_MINUTES = 15;
+  /** Consecutive wrong passwords before lockout. */
+  private static final int LOGIN_FAILS_BEFORE_LOCK = 3;
+  /** First lock duration (minutes); doubles each subsequent lock until {@link #LOCKOUT_MAX_MINUTES}. */
+  private static final int LOCKOUT_BASE_MINUTES = 5;
+  private static final int LOCKOUT_MAX_MINUTES = 24 * 60;
+
+  private static long lockoutDurationMinutes(int lockoutCount) {
+    if (lockoutCount <= 0) {
+      return LOCKOUT_BASE_MINUTES;
+    }
+    int exp = Math.min(lockoutCount - 1, 8);
+    long scaled = LOCKOUT_BASE_MINUTES * (1L << exp);
+    return Math.min(LOCKOUT_MAX_MINUTES, scaled);
+  }
 
   public TaRecruitService(Path dataDir, JwtHelper jwt, double maxTaHoursDefault) {
     this.usersPath = dataDir.resolve("users.json");
@@ -178,8 +191,10 @@ public final class TaRecruitService {
     try {
       List<ActivityLogRecord> logs = readLogsUnsafe();
       Counters c = readCountersUnsafe();
-      String email = requireStr(body.get("email"), "email");
+      String email = InputValidation.validateEmail(
+          body.get("email") == null ? null : String.valueOf(body.get("email")));
       String password = requireStr(body.get("password"), "password");
+      validatePasswordStrength(password);
       UserRole role;
       try {
         role = UserRole.fromString(requireStr(body.get("role"), "role"));
@@ -194,7 +209,11 @@ public final class TaRecruitService {
         throw new ApiException(400, role == UserRole.TA ? "TA accounts require student_id" : "MO accounts require staff_id");
       }
       String sid = studentId.strip();
+      InputValidation.maxLength(sid, InputValidation.MAX_STUDENT_OR_STAFF_ID, "student_id");
       String dn = optStr(body.get("display_name"));
+      if (dn != null && !dn.isBlank()) {
+        InputValidation.maxLength(dn.strip(), InputValidation.MAX_DISPLAY_NAME, "display_name");
+      }
       int newId = c.userSeq;
       try {
         if (role == UserRole.TA) {
@@ -243,8 +262,10 @@ public final class TaRecruitService {
       requireRole(requireUserUnsafe(readUsersUnsafe(), adminId), "admin");
       List<ActivityLogRecord> logs = readLogsUnsafe();
       Counters c = readCountersUnsafe();
-      String email = requireStr(body.get("email"), "email");
+      String email = InputValidation.validateEmail(
+          body.get("email") == null ? null : String.valueOf(body.get("email")));
       String password = requireStr(body.get("password"), "password");
+      validatePasswordStrength(password);
       String roleStr = requireStr(body.get("role"), "role");
       UserRole role;
       try {
@@ -259,6 +280,12 @@ public final class TaRecruitService {
       String studentId = optStr(body.get("student_id"));
       if (role == UserRole.MO && (studentId == null || studentId.isBlank())) {
         throw new ApiException(400, "MO accounts require staff_id");
+      }
+      if (dn != null && !dn.isBlank()) {
+        InputValidation.maxLength(dn.strip(), InputValidation.MAX_DISPLAY_NAME, "display_name");
+      }
+      if (studentId != null && !studentId.isBlank()) {
+        InputValidation.maxLength(studentId.strip(), InputValidation.MAX_STUDENT_OR_STAFF_ID, "student_id");
       }
       int newId = c.userSeq;
       try {
@@ -295,25 +322,32 @@ public final class TaRecruitService {
       List<UserRecord> users = readUsersUnsafe();
       List<ActivityLogRecord> logs = readLogsUnsafe();
       Counters c = readCountersUnsafe();
-      String email = requireStr(body.get("email"), "email");
+      String email = InputValidation.validateEmail(
+          body.get("email") == null ? null : String.valueOf(body.get("email")));
       String password = requireStr(body.get("password"), "password");
       UserRecord u = users.stream().filter(x -> x.email.equalsIgnoreCase(email)).findFirst().orElse(null);
       if (u == null) {
         throw new ApiException(401, "Invalid email or password");
       }
       if (u.locked_until != null && u.locked_until.isAfter(Instant.now())) {
-        throw new ApiException(423, "Account temporarily locked; try again later");
+        long sec = u.locked_until.getEpochSecond() - Instant.now().getEpochSecond();
+        long mins = Math.max(1L, (sec + 59) / 60);
+        throw new ApiException(423, "账号已暂时锁定，约 " + mins + " 分钟后可重试");
       }
       if (!userAccounts.passwordMatches(password, u.password_hash)) {
         u.failed_login_attempts = Math.min(u.failed_login_attempts + 1, 99);
-        if (u.failed_login_attempts >= MAX_LOGIN_FAILS) {
-          u.locked_until = Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES);
+        if (u.failed_login_attempts >= LOGIN_FAILS_BEFORE_LOCK) {
+          u.lockout_count = Math.min(u.lockout_count + 1, 99);
+          long mins = lockoutDurationMinutes(u.lockout_count);
+          u.locked_until = Instant.now().plus(mins, ChronoUnit.MINUTES);
+          u.failed_login_attempts = 0;
         }
         saveAll(users, null, null, null, null, logs, c);
         throw new ApiException(401, "Invalid email or password");
       }
       u.failed_login_attempts = 0;
       u.locked_until = null;
+      u.lockout_count = 0;
       logActivityUnsafe(logs, c, u.id, "login", "user", u.id, Map.of("email", u.email));
       saveAll(users, null, null, null, null, logs, c);
       return tokenMap(u.id);
@@ -657,11 +691,11 @@ public final class TaRecruitService {
         user.student_id = s.isEmpty() ? null : s;
       }
       if (body.containsKey("email") && body.get("email") != null) {
-        String ne = String.valueOf(body.get("email"));
+        String ne = InputValidation.validateEmail(String.valueOf(body.get("email")));
         if (users.stream().anyMatch(u -> u.id != user.id && u.email.equalsIgnoreCase(ne))) {
           throw new ApiException(400, "Email already in use");
         }
-        user.email = ne;
+        user.email = ne.toLowerCase(Locale.ROOT);
       }
       if (body.containsKey("skills") && body.get("skills") != null) {
         user.skills = String.valueOf(body.get("skills"));
@@ -670,6 +704,7 @@ public final class TaRecruitService {
         user.cv_file_path = String.valueOf(body.get("cv_file_path"));
       }
       patchProfileStructured(user, body);
+      validateTaProfileFields(user);
       logActivityUnsafe(logs, c, user.id, "profile_updated", "user", user.id, Map.of());
       saveAll(users, null, null, null, null, logs, c);
       return taProfileOut(user);
@@ -871,20 +906,51 @@ public final class TaRecruitService {
     try {
       UserRecord mo = requireRole(requireUserUnsafe(readUsersUnsafe(), userId), "mo");
       String name = requireStr(body.get("name"), "name");
+      InputValidation.maxLength(name, InputValidation.MAX_TEMPLATE_NAME, "name");
+      String mn = optStr(body.get("module_name"));
+      if (mn == null) {
+        mn = "";
+      }
+      InputValidation.maxLength(mn, InputValidation.MAX_MODULE_NAME, "module_name");
+      String rq = optStr(body.get("requirements"));
+      if (rq == null) {
+        rq = "";
+      }
+      InputValidation.maxLength(rq, InputValidation.MAX_REQUIREMENTS, "requirements");
+      String st = optStr(body.get("skill_tags"));
+      if (st == null) {
+        st = "";
+      }
+      InputValidation.maxLength(st, InputValidation.MAX_SKILL_TAGS, "skill_tags");
+      String sch = optStr(body.get("schedule_text"));
+      if (sch == null) {
+        sch = "";
+      }
+      InputValidation.maxLength(sch, InputValidation.MAX_SCHEDULE_TEXT, "schedule_text");
+      String jt = optStr(body.get("job_type"));
+      if (jt == null) {
+        jt = "course_ta";
+      }
+      InputValidation.maxLength(jt, InputValidation.MAX_JOB_TYPE, "job_type");
+      String term = optStr(body.get("term"));
+      if (term == null) {
+        term = "";
+      }
+      InputValidation.maxLength(term, InputValidation.MAX_TERM, "term");
       JobTemplatesFile tf = readJobTemplatesFile();
       String sid = "mo" + mo.id + "_" + name.replaceAll("[^a-zA-Z0-9_-]+", "_");
       Map<String, Object> row = new LinkedHashMap<>();
       row.put("saved_id", sid);
       row.put("mo_user_id", mo.id);
       row.put("name", name);
-      row.put("module_name", optStr(body.get("module_name")) != null ? optStr(body.get("module_name")) : "");
-      row.put("requirements", optStr(body.get("requirements")) != null ? optStr(body.get("requirements")) : "");
-      row.put("skill_tags", optStr(body.get("skill_tags")) != null ? optStr(body.get("skill_tags")) : "");
+      row.put("module_name", mn);
+      row.put("requirements", rq);
+      row.put("skill_tags", st);
       row.put("assigned_hours", body.get("assigned_hours") instanceof Number n ? n.doubleValue() : 5.0);
       row.put("quota", body.get("quota") instanceof Number n ? Math.max(1, n.intValue()) : 1);
-      row.put("job_type", optStr(body.get("job_type")) != null ? optStr(body.get("job_type")) : "course_ta");
-      row.put("term", optStr(body.get("term")) != null ? optStr(body.get("term")) : "");
-      row.put("schedule_text", optStr(body.get("schedule_text")) != null ? optStr(body.get("schedule_text")) : "");
+      row.put("job_type", jt);
+      row.put("term", term);
+      row.put("schedule_text", sch);
       row.put("allow_duplicate_apply_same_type", Boolean.TRUE.equals(body.get("allow_duplicate_apply_same_type"))
           || "true".equalsIgnoreCase(String.valueOf(body.get("allow_duplicate_apply_same_type"))));
       tf.saved.removeIf(x -> sid.equals(String.valueOf(x.get("saved_id"))));
@@ -963,6 +1029,7 @@ public final class TaRecruitService {
       Instant now = Instant.now();
       j.created_at = now;
       j.updated_at = now;
+      validateJobWriteFields(j);
       jobs.add(j);
       logActivityUnsafe(logs, c, mo.id, "job_created", "job", j.id, Map.of("module_name", j.module_name));
       List<NotificationRecord> notifs = null;
@@ -1024,6 +1091,7 @@ public final class TaRecruitService {
         job.allow_duplicate_apply_same_type =
             Boolean.TRUE.equals(body.get("allow_duplicate_apply_same_type"));
       }
+      validateJobWriteFields(job);
       job.updated_at = Instant.now();
       logActivityUnsafe(logs, c, mo.id, "job_updated", "job", job.id, Map.of());
       saveAll(users, jobs, null, null, null, logs, c);
@@ -1205,9 +1273,15 @@ public final class TaRecruitService {
           throw new ApiException(400, "Job quota is already filled");
         }
       }
-      List<String> warnings = new ArrayList<>();
+      List<String> moWarnings = new ArrayList<>();
       if ("accepted".equals(status)) {
-        warnings.addAll(computeAssignmentWarnings(users, assigns, jobs, job, appRow.ta_user_id, settings));
+        List<String> raw = computeAssignmentWarnings(users, assigns, jobs, job, appRow.ta_user_id, settings);
+        moWarnings = raw.stream()
+            .filter(w -> !w.startsWith("Overloaded"))
+            .collect(Collectors.toCollection(ArrayList::new));
+        if (moWarnings.isEmpty()) {
+          moWarnings.add("SafeToAssign");
+        }
       }
       appRow.status = status;
       if ("accepted".equals(status) || "rejected".equals(status)) {
@@ -1276,7 +1350,7 @@ public final class TaRecruitService {
       saveAll(users, jobs, apps, notifs, assigns, logs, c);
       Map<String, Object> res = new LinkedHashMap<>(
           applicationOut(apps, jobs, users, appRow, readEvaluationsUnsafe(), readCvFilesUnsafe(), false));
-      res.put("warnings", warnings);
+      res.put("warnings", moWarnings);
       return res;
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -1373,12 +1447,11 @@ public final class TaRecruitService {
             row.put("ta_user_id", u.id);
             row.put("display_name", u.display_name);
             row.put("email", u.email);
-            row.put("total_hours", th);
+            row.put("weekly_hours", th);
             row.put("overloaded", th > cap);
-            row.put("weekly_over_20", th > 20.0);
             return row;
           })
-          .sorted(Comparator.comparing((Map<String, Object> m) -> (Double) m.get("total_hours")).reversed())
+          .sorted(Comparator.comparing((Map<String, Object> m) -> (Double) m.get("weekly_hours")).reversed())
           .collect(Collectors.toList());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -1392,12 +1465,12 @@ public final class TaRecruitService {
     try {
       List<Map<String, Object>> rows = adminWorkload(userId, null);
       StringBuilder sb = new StringBuilder();
-      sb.append("ta_user_id,display_name,email,total_hours,overloaded\n");
+      sb.append("ta_user_id,display_name,email,weekly_hours,overloaded\n");
       for (Map<String, Object> r : rows) {
         sb.append(r.get("ta_user_id")).append(',');
         sb.append(csv(String.valueOf(r.get("display_name")))).append(',');
         sb.append(csv(String.valueOf(r.get("email")))).append(',');
-        sb.append(r.get("total_hours")).append(',');
+        sb.append(r.get("weekly_hours")).append(',');
         sb.append(r.get("overloaded")).append('\n');
       }
       return sb.toString();
@@ -1586,6 +1659,10 @@ public final class TaRecruitService {
       List<NotificationRecord> allNotifs = readNotificationsUnsafe();
       SettingsRecord st = readSettingsMergedUnsafe();
       long taCount = users.stream().filter(u -> "ta".equals(u.role)).count();
+      long moCount = users.stream().filter(u -> "mo".equals(u.role)).count();
+      long adminCount = users.stream().filter(u -> "admin".equals(u.role)).count();
+      long moTaCount = moCount + taCount;
+      long totalUserCount = taCount + moCount + adminCount;
       double totalH = assigns.stream().mapToDouble(a -> a.assigned_hours).sum();
       List<Map<String, Object>> wl = adminWorkload(userId, null);
       long overload = wl.stream().filter(r -> Boolean.TRUE.equals(r.get("overloaded"))).count();
@@ -1604,10 +1681,16 @@ public final class TaRecruitService {
           .count();
       Map<String, Object> m = new LinkedHashMap<>();
       m.put("ta_count", taCount);
-      m.put("total_assigned_hours", totalH);
+      m.put("mo_count", moCount);
+      m.put("admin_count", adminCount);
+      m.put("mo_ta_count", moTaCount);
+      m.put("total_user_count", totalUserCount);
+      m.put("weekly_assigned_hours_sum", totalH);
       m.put("overloaded_ta_count", overload);
       m.put("recent_activity", recent);
-      m.put("risk_alerts", overload > 0 ? List.of("Some TAs exceed overload threshold (" + st.overload_threshold_hours + "h)") : List.of());
+      m.put("risk_alerts", overload > 0
+          ? List.of("部分助教每周已分配工时累计超过超负荷阈值（" + st.overload_threshold_hours + " 工时/周）")
+          : List.of());
       Map<String, Object> insights = new LinkedHashMap<>();
       insights.put("notifications_last_7d", notifWeek);
       insights.put("jobs_stuck_screening_14d", stuckScreening);
@@ -2024,6 +2107,30 @@ public final class TaRecruitService {
     }
   }
 
+  private static void validateJobWriteFields(JobRecord j) {
+    InputValidation.maxLength(j.module_name, InputValidation.MAX_MODULE_NAME, "module_name");
+    InputValidation.maxLength(j.requirements, InputValidation.MAX_REQUIREMENTS, "requirements");
+    InputValidation.maxLength(j.deadline, InputValidation.MAX_DEADLINE_STR, "deadline");
+    InputValidation.maxLength(j.skill_tags, InputValidation.MAX_SKILL_TAGS, "skill_tags");
+    InputValidation.maxLength(j.job_type, InputValidation.MAX_JOB_TYPE, "job_type");
+    InputValidation.maxLength(j.term, InputValidation.MAX_TERM, "term");
+    InputValidation.maxLength(j.schedule_text, InputValidation.MAX_SCHEDULE_TEXT, "schedule_text");
+  }
+
+  private static void validateTaProfileFields(UserRecord u) {
+    InputValidation.maxLength(u.display_name, InputValidation.MAX_DISPLAY_NAME, "display_name");
+    InputValidation.validateEmail(u.email);
+    InputValidation.maxLength(u.student_id, InputValidation.MAX_STUDENT_OR_STAFF_ID, "student_id");
+    InputValidation.maxLength(u.skills, InputValidation.MAX_SKILLS, "skills");
+    InputValidation.maxLength(u.cv_file_path, InputValidation.MAX_CV_PATH, "cv_file_path");
+    InputValidation.maxLength(u.preferred_courses, InputValidation.MAX_FREE_TEXT, "preferred_courses");
+    InputValidation.maxLength(u.languages, InputValidation.MAX_FREE_TEXT, "languages");
+    InputValidation.maxLength(u.availability_json, InputValidation.MAX_FREE_TEXT, "availability_json");
+    InputValidation.maxLength(u.ta_history, InputValidation.MAX_FREE_TEXT, "ta_history");
+    InputValidation.maxLength(u.certificates, InputValidation.MAX_FREE_TEXT, "certificates");
+    InputValidation.maxLength(u.gpa, InputValidation.MAX_GPA_STR, "gpa");
+  }
+
   private static void normalizeJob(JobRecord j) {
     if (j.status == null || j.status.isBlank()) {
       j.status = "open";
@@ -2060,7 +2167,10 @@ public final class TaRecruitService {
     return RECRUITING.contains(j.status) && acceptedCount(apps, j.id) < j.quota;
   }
 
-  /** Workload checker: sum TA weekly hours from active applications by traversing JSON records. */
+  /**
+   * Sum each TA's weekly hours across active applications (pending / interviewing / accepted):
+   * each job contributes {@link JobRecord#assigned_hours} once per application.
+   */
   private static Map<Integer, Double> computeTaAppliedWeeklyHours(
       List<ApplicationRecord> apps, List<JobRecord> jobs) {
     Map<Integer, JobRecord> jobIndex = jobs.stream()
@@ -2294,10 +2404,10 @@ public final class TaRecruitService {
         .mapToDouble(a -> a.assigned_hours)
         .sum();
     if (total + job.assigned_hours > cap) {
-      w.add("Overloaded: total assigned hours would exceed threshold (" + cap + "h)");
+      w.add("Overloaded: weekly assigned hours would exceed threshold (" + cap + " h/week)");
     }
     if (ta != null && ta.max_weekly_hours > 0 && job.assigned_hours > ta.max_weekly_hours) {
-      w.add("ScheduleConflict: job hours exceed TA declared max weekly hours");
+      w.add("ScheduleConflict: this job's weekly hours exceed TA's declared max (h/week)");
     }
     if (w.isEmpty()) {
       w.add("SafeToAssign");
@@ -2311,7 +2421,9 @@ public final class TaRecruitService {
       List<Object> raw = (List<Object>) body.get("profile_skills");
       user.profile_skills = new ArrayList<>();
       for (Object o : raw) {
-        user.profile_skills.add(String.valueOf(o));
+        String item = String.valueOf(o);
+        InputValidation.maxLength(item, InputValidation.MAX_PROFILE_SKILL_ITEM, "profile_skills");
+        user.profile_skills.add(item);
       }
     }
     if (body.containsKey("preferred_courses") && body.get("preferred_courses") != null) {

@@ -6,4 +6,20 @@
   "assigned_hours" : 6.0,
   "term" : "2025-2026-1",
   "created_at" : "2026-04-11T06:49:33.531588Z"
+}, {
+  "id" : 2,
+  "ta_user_id" : 2,
+  "job_id" : 5,
+  "application_id" : 2,
+  "assigned_hours" : 8.0,
+  "term" : "2025-2026-1",
+  "created_at" : "2026-04-11T14:21:09.704320Z"
+}, {
+  "id" : 3,
+  "ta_user_id" : 2,
+  "job_id" : 6,
+  "application_id" : 3,
+  "assigned_hours" : 18.0,
+  "term" : "2025-2026-1",
+  "created_at" : "2026-04-11T14:22:11.648304Z"
 } ]
