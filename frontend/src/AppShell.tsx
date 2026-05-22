@@ -52,7 +52,7 @@ export default function AppShell({
         : [
             { to: "/admin", label: "总览" },
             { to: "/admin/notifications", label: "通知", badge: unreadN },
-            { to: "/admin/users", label: "创建用户" },
+            { to: "/admin/users", label: "用户管理" },
             { to: "/admin/settings", label: "系统设置" },
             { to: "/admin/logs", label: "活动日志" },
           ];

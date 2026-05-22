@@ -21,6 +21,8 @@ public final class UserRecord {
   public Instant locked_until;
   /** Incremented each time an account is locked after repeated failed logins; drives escalating lock duration. */
   public int lockout_count = 0;
+  /** When true, login and authenticated API access are rejected until re-enabled by an administrator. */
+  public boolean disabled = false;
   /** Structured profile (TA) */
   public List<String> profile_skills = new ArrayList<>();
   public String preferred_courses = "";
