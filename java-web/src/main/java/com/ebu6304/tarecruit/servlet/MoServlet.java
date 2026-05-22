@@ -22,6 +22,8 @@ public final class MoServlet extends JsonServlet {
   private static final Pattern JOB_CSV = Pattern.compile("^/jobs/(\\d+)/export\\.csv$");
   private static final Pattern APP_DECIDE = Pattern.compile("^/applications/(\\d+)$");
   private static final Pattern APP_EVAL = Pattern.compile("^/applications/(\\d+)/evaluation$");
+  private static final Pattern APP_AUTO_EVAL = Pattern.compile("^/applications/(\\d+)/auto-evaluation$");
+  private static final Pattern JOB_AUTO_EVAL_ALL = Pattern.compile("^/jobs/(\\d+)/applications/auto-evaluate-all$");
   private static final Pattern APP_CV = Pattern.compile("^/applications/(\\d+)/cv$");
 
   @Override
@@ -127,6 +129,16 @@ public final class MoServlet extends JsonServlet {
       Matcher me = APP_EVAL.matcher(pi);
       if (me.matches()) {
         writeJson(resp, 200, s.moSaveEvaluation(uid, Integer.parseInt(me.group(1)), readMap(req)));
+        return;
+      }
+      Matcher mae = APP_AUTO_EVAL.matcher(pi);
+      if (mae.matches()) {
+        writeJson(resp, 200, s.autoEvaluateApplication(uid, Integer.parseInt(mae.group(1))));
+        return;
+      }
+      Matcher mjae = JOB_AUTO_EVAL_ALL.matcher(pi);
+      if (mjae.matches()) {
+        writeJson(resp, 200, s.autoEvaluateJobApplications(uid, Integer.parseInt(mjae.group(1))));
         return;
       }
       resp.sendError(HttpServletResponse.SC_NOT_FOUND);
