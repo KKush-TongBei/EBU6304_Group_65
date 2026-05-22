@@ -1,5 +1,6 @@
 import { Component, ReactNode } from "react";
 import { withAppBase } from "../appBase";
+import { translate, getStoredLocale } from "../locales";
 
 interface Props {
   children: ReactNode;
@@ -35,21 +36,22 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback;
       }
+      const locale = getStoredLocale();
       return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100 dark:bg-slate-950">
           <div className="text-center max-w-md">
             <div className="text-6xl mb-4">⚠️</div>
             <h1 className="font-display text-xl font-bold text-ink-950 dark:text-white mb-2">
-              页面出错了
+              {translate(locale, "common.pageError")}
             </h1>
             <p className="text-ink-600 dark:text-slate-300 mb-4">
-              {this.state.error?.message || "发生了未知错误，请刷新页面重试"}
+              {this.state.error?.message || translate(locale, "common.unknownError")}
             </p>
             <button
               onClick={this.handleReset}
               className="px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent-dim transition"
             >
-              返回首页
+              {translate(locale, "common.backHome")}
             </button>
           </div>
         </div>

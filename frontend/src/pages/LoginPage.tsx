@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../AuthContext";
+import { useLocale } from "../locale";
 import { Button, Card, Input } from "../ui";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
   const { login, user } = useAuth();
+  const { t, te } = useLocale();
   const nav = useNavigate();
   const [params] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -19,10 +21,10 @@ export default function LoginPage() {
   useEffect(() => {
     const reason = params.get("reason");
     if (reason === "session" || sessionStorage.getItem("ta_session_expired")) {
-      setSessionHint("登录已过期，请重新登录。");
+      setSessionHint(t("auth.sessionExpired"));
       sessionStorage.removeItem("ta_session_expired");
     }
-  }, [params]);
+  }, [params, t]);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
@@ -36,17 +38,17 @@ export default function LoginPage() {
     e.preventDefault();
     setErr("");
     if (!email.trim()) {
-      setErr("请输入邮箱");
+      setErr(t("auth.emailRequired"));
       emailRef.current?.focus();
       return;
     }
     if (!EMAIL_RE.test(email.trim())) {
-      setErr("邮箱格式不正确");
+      setErr(t("auth.emailInvalid"));
       emailRef.current?.focus();
       return;
     }
     if (!password) {
-      setErr("请输入密码");
+      setErr(t("auth.passwordRequired"));
       passwordRef.current?.focus();
       return;
     }
@@ -57,7 +59,7 @@ export default function LoginPage() {
       else if (u.role === "mo") nav("/mo");
       else nav("/admin");
     } catch (e2: unknown) {
-      setErr(e2 instanceof Error ? e2.message : "登录失败");
+      setErr(e2 instanceof Error ? te(e2.message) : t("auth.loginFailed"));
     } finally {
       setBusy(false);
     }
@@ -68,11 +70,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="font-display text-3xl font-bold text-ink-950 dark:text-white tracking-tight">
-            助教招聘系统
+            {t("auth.systemTitle")}
           </h1>
-          <p className="text-ink-500 dark:text-slate-400 mt-2 text-sm">
-            Teaching Assistant Recruitment · BUPT International
-          </p>
+          <p className="text-ink-500 dark:text-slate-400 mt-2 text-sm">{t("auth.systemSubtitle")}</p>
         </div>
         <Card className="p-8">
           {sessionHint ? (
@@ -83,7 +83,7 @@ export default function LoginPage() {
           <form onSubmit={submit} className="space-y-4" noValidate>
             <div>
               <label htmlFor="login-email" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
-                邮箱
+                {t("common.email")}
               </label>
               <Input
                 id="login-email"
@@ -99,7 +99,7 @@ export default function LoginPage() {
             </div>
             <div>
               <label htmlFor="login-password" className="block text-xs font-semibold text-ink-700 dark:text-slate-300 mb-1">
-                密码
+                {t("common.password")}
               </label>
               <div className="relative">
                 <Input
@@ -109,17 +109,17 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
-                  placeholder="请输入密码"
+                  placeholder={t("auth.passwordPlaceholder")}
                   aria-invalid={!!err && !password}
                   className="pr-16"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  aria-label={showPassword ? t("common.hidePassword") : t("common.showPassword")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink-600 dark:text-slate-300 hover:text-accent"
                 >
-                  {showPassword ? "隐藏" : "显示"}
+                  {showPassword ? t("common.hidePassword") : t("common.showPassword")}
                 </button>
               </div>
             </div>
@@ -129,13 +129,13 @@ export default function LoginPage() {
               </p>
             )}
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "登录中…" : "登录"}
+              {busy ? t("auth.loggingIn") : t("auth.login")}
             </Button>
           </form>
           <p className="text-center text-sm text-ink-500 dark:text-slate-400 mt-6">
-            没有账号？{" "}
+            {t("auth.noAccount")}{" "}
             <Link to="/register" className="text-accent font-semibold hover:underline">
-              注册
+              {t("auth.registerLink")}
             </Link>
           </p>
         </Card>
