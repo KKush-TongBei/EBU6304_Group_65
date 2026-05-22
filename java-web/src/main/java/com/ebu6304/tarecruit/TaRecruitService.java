@@ -628,9 +628,7 @@ public final class TaRecruitService {
   public UserRecord requireUser(int userId) {
     rw.readLock().lock();
     try {
-      List<UserRecord> users = readUsersUnsafe();
-      return users.stream().filter(u -> u.id == userId).findFirst().orElseThrow(
-          () -> new ApiException(401, "User not found"));
+      return requireUserUnsafe(readUsersUnsafe(), userId);
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {

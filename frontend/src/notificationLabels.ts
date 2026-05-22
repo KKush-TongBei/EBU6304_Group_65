@@ -1,25 +1,28 @@
+import type { Locale } from "./locales";
+import { translate } from "./locales";
+
 /** Human-readable labels for in-app notification categories (API stores English slugs). */
-export function notificationCategoryLabel(category?: string): string {
+export function notificationCategoryLabel(category: string | undefined, locale: Locale): string {
   if (!category) {
-    return "系统";
+    return translate(locale, "notifications.categorySystem");
   }
   switch (category) {
     case "workload_alert":
-      return "工时提醒";
+      return translate(locale, "notifications.categoryWorkload");
     case "decision":
-      return "申请结果";
+      return translate(locale, "notifications.categoryDecision");
     case "application":
-      return "申请动态";
+      return translate(locale, "notifications.categoryApplication");
     case "job":
-      return "岗位";
+      return translate(locale, "notifications.categoryJob");
     case "job_closed":
-      return "岗位关闭";
+      return translate(locale, "notifications.categoryJobClosed");
     case "deadline":
-      return "截止提醒";
+      return translate(locale, "notifications.categoryDeadline");
     case "profile":
-      return "资料";
+      return translate(locale, "notifications.categoryProfile");
     case "system":
-      return "系统";
+      return translate(locale, "notifications.categorySystem");
     default:
       return category;
   }
