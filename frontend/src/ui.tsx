@@ -4,6 +4,7 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
 } from "react";
+import { useLocale } from "./locale";
 
 const cardBase =
   "rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 shadow-soft dark:shadow-none";
@@ -140,38 +141,61 @@ export function Badge({
 }
 
 export function StatusBadge({ status, pill = true }: { status: string; pill?: boolean }) {
+  const { t } = useLocale();
   const s = status.toLowerCase();
-  if (s === "pending") return <Badge tone="warn" pill={pill}>已申请</Badge>;
-  if (s === "interviewing") return <Badge tone="info" pill={pill}>面试中</Badge>;
-  if (s === "accepted") return <Badge tone="ok" pill={pill}>已录用</Badge>;
-  if (s === "rejected") return <Badge tone="bad" pill={pill}>已拒绝</Badge>;
-  if (s === "withdrawn") return <Badge tone="neutral" pill={pill}>已撤回</Badge>;
-  if (s === "open") return <Badge tone="ok" pill={pill}>开放</Badge>;
-  if (s === "draft") return <Badge tone="neutral" pill={pill}>草稿</Badge>;
-  if (s === "screening") return <Badge tone="warn" pill={pill}>筛选中</Badge>;
-  if (s === "interview") return <Badge tone="warn" pill={pill}>候选中</Badge>;
-  if (s === "shortlist") return <Badge tone="warn" pill={pill}>短名单</Badge>;
-  if (s === "filled") return <Badge tone="ok" pill={pill}>已招满</Badge>;
-  if (s === "closed") return <Badge tone="neutral" pill={pill}>已关闭</Badge>;
-  if (s === "cancelled") return <Badge tone="bad" pill={pill}>已取消</Badge>;
+  const keyMap: Record<string, string> = {
+    pending: "status.pending",
+    interviewing: "status.interviewing",
+    accepted: "status.accepted",
+    rejected: "status.rejected",
+    withdrawn: "status.withdrawn",
+    open: "status.open",
+    draft: "status.draft",
+    screening: "status.screening",
+    interview: "status.interview",
+    shortlist: "status.shortlist",
+    filled: "status.filled",
+    closed: "status.closed",
+    cancelled: "status.cancelled",
+  };
+  const key = keyMap[s];
+  if (key) {
+    const tone =
+      s === "pending" || s === "screening" || s === "interview" || s === "shortlist"
+        ? "warn"
+        : s === "interviewing"
+          ? "info"
+          : s === "accepted" || s === "open" || s === "filled"
+            ? "ok"
+            : s === "rejected" || s === "cancelled"
+              ? "bad"
+              : "neutral";
+    return (
+      <Badge tone={tone as "warn" | "info" | "ok" | "bad" | "neutral"} pill={pill}>
+        {t(key)}
+      </Badge>
+    );
+  }
   return <Badge pill={pill}>{status}</Badge>;
 }
 
 export function Spinner({ className = "" }: { className?: string }) {
+  const { t } = useLocale();
   return (
     <span
       className={`inline-block h-8 w-8 rounded-full border-2 border-slate-200 dark:border-slate-600 border-t-accent animate-spin ${className}`}
       role="status"
-      aria-label="加载中"
+      aria-label={t("common.loading")}
     />
   );
 }
 
 export function PageLoading() {
+  const { t } = useLocale();
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-ink-500 dark:text-slate-400">
       <Spinner />
-      <span className="text-sm">加载中…</span>
+      <span className="text-sm">{t("common.loading")}</span>
     </div>
   );
 }

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { api, downloadWithAuth } from "../../api";
 import { useFeedback } from "../../feedback";
+import { useLocale } from "../../locale";
 import type { ActivityLog } from "../../types";
 import AppShell from "../../AppShell";
 import { Button, Card, Input } from "../../ui";
 
 export default function AdminLogs() {
   const { toast } = useFeedback();
+  const { t, te } = useLocale();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actor, setActor] = useState("");
@@ -31,7 +33,7 @@ export default function AdminLogs() {
       .then(setLogs)
       .catch(() => {
         setLogs([]);
-        toast("日志加载失败", "error");
+        toast(t("admin.logsLoadFailed"), "error");
       })
       .finally(() => setLoading(false));
   };
@@ -54,63 +56,63 @@ export default function AdminLogs() {
         }),
         "activity_logs.csv"
       );
-      toast("导出成功", "success");
+      toast(t("common.exportSuccess"), "success");
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "导出失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("common.exportFailed"), "error");
     }
   };
 
   return (
-    <AppShell title="活动日志" role="admin">
+    <AppShell title={t("shell.titleAdminLogs")} role="admin">
       <Card className="p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label htmlFor="log-actor" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-              操作者用户 ID
+              {t("admin.actorId")}
             </label>
             <Input id="log-actor" className="mt-1 w-32" value={actor} onChange={(e) => setActor(e.target.value)} />
           </div>
           <div>
             <label htmlFor="log-action" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-              动作（精确匹配）
+              {t("admin.actionExact")}
             </label>
             <Input
               id="log-action"
               className="mt-1 w-40"
               value={action}
               onChange={(e) => setAction(e.target.value)}
-              placeholder="如 job_created"
+              placeholder={t("admin.actionPlaceholder")}
             />
           </div>
           <div>
             <label htmlFor="log-from" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-              起始时间 ISO
+              {t("admin.fromIso")}
             </label>
             <Input id="log-from" className="mt-1 w-48" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
           <div>
             <label htmlFor="log-to" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-              结束时间 ISO
+              {t("admin.toIso")}
             </label>
             <Input id="log-to" className="mt-1 w-48" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
           <div>
             <label htmlFor="log-entity" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-              实体类型
+              {t("admin.entityType")}
             </label>
             <Input
               id="log-entity"
               className="mt-1 w-28"
               value={entityType}
               onChange={(e) => setEntityType(e.target.value)}
-              placeholder="job / user"
+              placeholder={t("admin.entityPlaceholder")}
             />
           </div>
           <Button type="button" onClick={fetchLogs} disabled={loading}>
-            查询
+            {t("common.query")}
           </Button>
           <Button type="button" variant="secondary" onClick={exportCsv}>
-            导出 CSV
+            {t("common.exportCsv")}
           </Button>
         </div>
       </Card>
@@ -118,37 +120,37 @@ export default function AdminLogs() {
       <Card className="overflow-hidden relative">
         {loading ? (
           <div className="absolute inset-0 z-[1] bg-white/70 dark:bg-slate-900/70 flex items-center justify-center text-sm text-ink-600">
-            加载中…
+            {t("common.loading")}
           </div>
         ) : null}
         <div className="max-h-[70vh] overflow-y-auto overflow-x-auto">
-          <table className="w-full text-xs text-left min-w-[640px]" aria-label="系统活动日志">
-              <thead className="sticky top-0 z-[1] bg-slate-100 dark:bg-slate-800 font-semibold text-ink-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th scope="col" className="px-3 py-2">
-                    时间
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    操作
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    实体
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    用户
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    详情
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((l, i) => {
-                  const risk =
-                    l.action.includes("application_accepted") ||
-                    l.action.includes("application_rejected") ||
-                    l.action.includes("config_changed");
-                  return (
+          <table className="w-full text-xs text-left min-w-[640px]" aria-label={t("admin.logsTable")}>
+            <thead className="sticky top-0 z-[1] bg-slate-100 dark:bg-slate-800 font-semibold text-ink-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700">
+              <tr>
+                <th scope="col" className="px-3 py-2">
+                  {t("admin.time")}
+                </th>
+                <th scope="col" className="px-3 py-2">
+                  {t("admin.action")}
+                </th>
+                <th scope="col" className="px-3 py-2">
+                  {t("admin.entity")}
+                </th>
+                <th scope="col" className="px-3 py-2">
+                  {t("admin.user")}
+                </th>
+                <th scope="col" className="px-3 py-2">
+                  {t("admin.details")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((l, i) => {
+                const risk =
+                  l.action.includes("application_accepted") ||
+                  l.action.includes("application_rejected") ||
+                  l.action.includes("config_changed");
+                return (
                   <tr
                     key={l.id}
                     className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
@@ -163,14 +165,14 @@ export default function AdminLogs() {
                       {l.entity_type}
                       {l.entity_id != null ? `#${l.entity_id}` : ""}
                     </td>
-                    <td className="px-3 py-2 text-ink-700 dark:text-slate-200">{l.actor_user_id ?? "—"}</td>
+                    <td className="px-3 py-2 text-ink-700 dark:text-slate-200">{l.actor_user_id ?? t("common.dash")}</td>
                     <td className="px-3 py-2 text-ink-500 dark:text-slate-400 max-w-xs truncate">
-                      {l.payload ? JSON.stringify(l.payload) : "—"}
+                      {l.payload ? JSON.stringify(l.payload) : t("common.dash")}
                     </td>
                   </tr>
-                  );
-                })}
-              </tbody>
+                );
+              })}
+            </tbody>
           </table>
         </div>
       </Card>
