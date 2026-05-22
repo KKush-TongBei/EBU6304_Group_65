@@ -7,14 +7,23 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @WebServlet("/api/admin/*")
 public final class AdminServlet extends JsonServlet {
+  private static final Pattern USER_ID = Pattern.compile("^/users/(\\d+)$");
+
   @Override
   protected void service(HttpServletRequest req, HttpServletResponse resp)
       throws jakarta.servlet.ServletException, IOException {
-    if ("PATCH".equals(req.getMethod())) {
+    String method = req.getMethod();
+    if ("PATCH".equals(method)) {
       doPatch(req, resp);
+      return;
+    }
+    if ("DELETE".equals(method)) {
+      doDelete(req, resp);
       return;
     }
     super.service(req, resp);
@@ -79,6 +88,14 @@ public final class AdminServlet extends JsonServlet {
         resp.getOutputStream().write(csv.getBytes(StandardCharsets.UTF_8));
         return;
       }
+      if ("/users".equals(pi)) {
+        int skip = parseInt(req.getParameter("skip"), 0);
+        int limit = parseInt(req.getParameter("limit"), 50);
+        limit = Math.min(Math.max(limit, 1), 200);
+        skip = Math.max(skip, 0);
+        writeJson(resp, 200, s.adminListUsers(uid, req.getParameter("role"), req.getParameter("q"), skip, limit));
+        return;
+      }
       resp.sendError(HttpServletResponse.SC_NOT_FOUND);
     } catch (Exception e) {
       handleError(resp, e);
@@ -106,8 +123,40 @@ public final class AdminServlet extends JsonServlet {
       TaRecruitService s = svc(req);
       int uid = userId(req);
       String pi = req.getPathInfo();
+      if (pi == null) {
+        resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+        return;
+      }
       if ("/settings".equals(pi)) {
         writeJson(resp, 200, s.adminPatchSettings(uid, readMap(req)));
+        return;
+      }
+      Matcher userMatcher = USER_ID.matcher(pi);
+      if (userMatcher.matches()) {
+        int targetId = Integer.parseInt(userMatcher.group(1));
+        writeJson(resp, 200, s.adminPatchUser(uid, targetId, readMap(req)));
+        return;
+      }
+      resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+    } catch (Exception e) {
+      handleError(resp, e);
+    }
+  }
+
+  @Override
+  protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    try {
+      TaRecruitService s = svc(req);
+      int uid = userId(req);
+      String pi = req.getPathInfo();
+      if (pi == null) {
+        resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+        return;
+      }
+      Matcher userMatcher = USER_ID.matcher(pi);
+      if (userMatcher.matches()) {
+        int targetId = Integer.parseInt(userMatcher.group(1));
+        writeJson(resp, 200, s.adminDeleteUser(uid, targetId));
         return;
       }
       resp.sendError(HttpServletResponse.SC_NOT_FOUND);
