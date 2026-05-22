@@ -88,6 +88,7 @@ public final class UserService {
     u.failed_login_attempts = 0;
     u.locked_until = null;
     u.lockout_count = 0;
+    u.disabled = false;
 
     dao.insert(u);
     return sanitize(u);
@@ -126,6 +127,7 @@ public final class UserService {
     u.failed_login_attempts = 0;
     u.locked_until = null;
     u.lockout_count = 0;
+    u.disabled = false;
 
     dao.insert(u);
     return sanitize(u);

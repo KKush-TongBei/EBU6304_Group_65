@@ -3,6 +3,7 @@ package com.ebu6304.tarecruit;
 import com.ebu6304.tarecruit.api.ApiException;
 import com.ebu6304.tarecruit.api.InputValidation;
 import com.ebu6304.tarecruit.auth.JwtHelper;
+import com.ebu6304.tarecruit.auth.Passwords;
 import com.ebu6304.tarecruit.domain.ActivityLogRecord;
 import com.ebu6304.tarecruit.domain.ApplicationEvaluationRecord;
 import com.ebu6304.tarecruit.domain.ApplicationRecord;
@@ -316,6 +317,181 @@ public final class TaRecruitService {
     }
   }
 
+  public Map<String, Object> adminListUsers(
+      int adminId, String roleFilter, String q, int skip, int limit) {
+    rw.readLock().lock();
+    try {
+      requireRole(requireUserUnsafe(readUsersUnsafe(), adminId), "admin");
+      List<UserRecord> users = readUsersUnsafe();
+      String qn = q != null ? q.strip().toLowerCase(Locale.ROOT) : "";
+      String rf = roleFilter != null ? roleFilter.strip().toLowerCase(Locale.ROOT) : "";
+      List<UserRecord> filtered = users.stream()
+          .filter(u -> rf.isEmpty() || rf.equals(u.role))
+          .filter(u -> {
+            if (qn.isEmpty()) {
+              return true;
+            }
+            String email = u.email != null ? u.email.toLowerCase(Locale.ROOT) : "";
+            String dn = u.display_name != null ? u.display_name.toLowerCase(Locale.ROOT) : "";
+            String sid = u.student_id != null ? u.student_id.toLowerCase(Locale.ROOT) : "";
+            return email.contains(qn) || dn.contains(qn) || sid.contains(qn);
+          })
+          .sorted(Comparator
+              .comparing((UserRecord u) -> u.created_at != null ? u.created_at : Instant.EPOCH)
+              .reversed()
+              .thenComparing(Comparator.comparingInt((UserRecord u) -> u.id).reversed()))
+          .collect(Collectors.toList());
+      int total = filtered.size();
+      int from = Math.min(Math.max(skip, 0), total);
+      int to = Math.min(from + Math.min(Math.max(limit, 1), 200), total);
+      List<Map<String, Object>> items = filtered.subList(from, to).stream()
+          .map(TaRecruitService::adminUserOut)
+          .collect(Collectors.toList());
+      Map<String, Object> out = new LinkedHashMap<>();
+      out.put("items", items);
+      out.put("total", total);
+      return out;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.readLock().unlock();
+    }
+  }
+
+  public Map<String, Object> adminPatchUser(int adminId, int targetId, Map<String, Object> body) {
+    rw.writeLock().lock();
+    try {
+      requireRole(requireUserUnsafe(readUsersUnsafe(), adminId), "admin");
+      List<UserRecord> users = readUsersUnsafe();
+      UserRecord target = findUserUnsafe(users, targetId);
+      List<ActivityLogRecord> logs = readLogsUnsafe();
+      Counters c = readCountersUnsafe();
+      boolean changed = false;
+
+      if (body != null && body.containsKey("disabled")) {
+        boolean wantDisabled = Boolean.TRUE.equals(body.get("disabled"));
+        if ("admin".equals(target.role)) {
+          throw new ApiException(403, "不能禁用管理员账号");
+        }
+        if (target.disabled != wantDisabled) {
+          target.disabled = wantDisabled;
+          if (!wantDisabled) {
+            target.failed_login_attempts = 0;
+            target.locked_until = null;
+            target.lockout_count = 0;
+          }
+          logActivityUnsafe(
+              logs,
+              c,
+              adminId,
+              wantDisabled ? "user_disabled_by_admin" : "user_enabled_by_admin",
+              "user",
+              targetId,
+              Map.of("email", target.email, "role", target.role));
+          changed = true;
+        }
+      }
+
+      if (body != null && body.containsKey("password") && body.get("password") != null) {
+        String password = requireStr(body.get("password"), "password");
+        validatePasswordStrength(password);
+        target.password_hash = Passwords.hash(password);
+        logActivityUnsafe(
+            logs,
+            c,
+            adminId,
+            "user_password_reset_by_admin",
+            "user",
+            targetId,
+            Map.of("email", target.email, "role", target.role));
+        changed = true;
+      }
+
+      if (!changed) {
+        throw new ApiException(400, "No supported fields to update");
+      }
+      saveAll(users, null, null, null, null, logs, c);
+      return adminUserOut(target);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
+  public Map<String, Object> adminDeleteUser(int adminId, int targetId) {
+    rw.writeLock().lock();
+    try {
+      requireRole(requireUserUnsafe(readUsersUnsafe(), adminId), "admin");
+      if (adminId == targetId) {
+        throw new ApiException(403, "不能删除当前登录的管理员账号");
+      }
+      List<UserRecord> users = readUsersUnsafe();
+      UserRecord target = findUserUnsafe(users, targetId);
+      if ("admin".equals(target.role)) {
+        throw new ApiException(403, "不能删除管理员账号");
+      }
+      if (!"ta".equals(target.role) && !"mo".equals(target.role)) {
+        throw new ApiException(400, "只能删除助教或课程负责人账号");
+      }
+
+      List<JobRecord> jobs = readJobsUnsafe();
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      List<ApplicationEvaluationRecord> evals = readEvaluationsUnsafe();
+      List<NotificationRecord> notifs = readNotificationsUnsafe();
+      List<AssignmentRecord> assigns = readAssignmentsUnsafe();
+      List<JobFavoriteRecord> favs = readFavoritesUnsafe();
+      List<CvFileRecord> cvFiles = readCvFilesUnsafe();
+      List<ActivityLogRecord> logs = readLogsUnsafe();
+      Counters c = readCountersUnsafe();
+      SettingsRecord settings = readSettingsMergedUnsafe();
+
+      String roleLabel = "ta".equals(target.role) ? "助教" : "课程负责人";
+      String idHint =
+          target.student_id != null && !target.student_id.isBlank()
+              ? target.student_id
+              : ("用户 ID " + target.id);
+      String nameHint =
+          target.display_name != null && !target.display_name.isBlank()
+              ? target.display_name
+              : target.email;
+
+      cascadeRemoveUserData(
+          target,
+          adminId,
+          true,
+          "user_deleted_by_admin",
+          Map.of(
+              "email", target.email,
+              "role", target.role,
+              "deleted_by_admin_id", adminId),
+          true,
+          "管理员已删除用户",
+          roleLabel + "「" + nameHint + "」已被管理员删除（" + idHint + "，" + target.email + "）。",
+          users,
+          jobs,
+          apps,
+          evals,
+          notifs,
+          assigns,
+          favs,
+          cvFiles,
+          logs,
+          c,
+          settings);
+
+      saveAll(users, jobs, apps, notifs, assigns, logs, c);
+      saveEvaluationsUnsafe(evals);
+      saveFavoritesUnsafe(favs);
+      saveCvFilesUnsafe(cvFiles);
+      return Map.of("ok", true);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
   public Map<String, Object> login(Map<String, Object> body) {
     rw.writeLock().lock();
     try {
@@ -333,6 +509,9 @@ public final class TaRecruitService {
         long sec = u.locked_until.getEpochSecond() - Instant.now().getEpochSecond();
         long mins = Math.max(1L, (sec + 59) / 60);
         throw new ApiException(423, "账号已暂时锁定，约 " + mins + " 分钟后可重试");
+      }
+      if (u.disabled) {
+        throw new ApiException(403, "账号已禁用");
       }
       if (!userAccounts.passwordMatches(password, u.password_hash)) {
         u.failed_login_attempts = Math.min(u.failed_login_attempts + 1, 99);
@@ -379,7 +558,7 @@ public final class TaRecruitService {
     try {
       String password = requireStr(body.get("password"), "password");
       List<UserRecord> users = readUsersUnsafe();
-      UserRecord u = requireUserUnsafe(users, userId);
+      UserRecord u = findUserUnsafe(users, userId);
       if ("admin".equals(u.role)) {
         throw new ApiException(403, "管理员账号不可自行注销");
       }
@@ -404,49 +583,31 @@ public final class TaRecruitService {
       Counters c = readCountersUnsafe();
       SettingsRecord settings = readSettingsMergedUnsafe();
 
-      Set<Integer> appIds = apps.stream()
-          .filter(a -> a.ta_user_id == userId)
-          .map(a -> a.id)
-          .collect(Collectors.toSet());
-
-      for (CvFileRecord cf : cvFiles) {
-        if (cf.user_id == userId) {
-          deleteCvPayloadFileBestEffort(cf);
-        }
-      }
-
       String email = u.email;
       String roleLabel = "ta".equals(u.role) ? "助教" : "课程负责人";
       String idHint = u.student_id != null && !u.student_id.isBlank() ? u.student_id : ("用户 ID " + u.id);
       String nameHint = u.display_name != null && !u.display_name.isBlank() ? u.display_name : email;
 
-      apps.removeIf(a -> a.ta_user_id == userId);
-      evals.removeIf(e -> appIds.contains(e.application_id));
-      notifs.removeIf(n ->
-          n.user_id == userId
-              || (n.application_id != null && appIds.contains(n.application_id))
-              || (n.link_application_id != null && appIds.contains(n.link_application_id)));
-      assigns.removeIf(a -> a.ta_user_id == userId || appIds.contains(a.application_id));
-      favs.removeIf(f -> f.user_id == userId);
-      cvFiles.removeIf(f -> f.user_id == userId);
-      logs.removeIf(log ->
-          ("user".equals(log.entity_type) && log.entity_id != null && log.entity_id == userId)
-              || ("application".equals(log.entity_type) && log.entity_id != null && appIds.contains(log.entity_id)));
-
-      if (settings.notifications_enabled) {
-        notifyAdminsUnsafe(
-            notifs,
-            users,
-            settings,
-            c,
-            "用户已注销账号",
-            roleLabel + "「" + nameHint + "」已自行注销（" + idHint + "，" + email + "）。",
-            "system");
-      }
-
-      users.removeIf(x -> x.id == userId);
-      logActivityUnsafe(logs, c, userId, "account_self_deleted", "user", userId,
-          Map.of("email", email, "role", u.role));
+      cascadeRemoveUserData(
+          u,
+          userId,
+          false,
+          "account_self_deleted",
+          Map.of("email", email, "role", u.role),
+          true,
+          "用户已注销账号",
+          roleLabel + "「" + nameHint + "」已自行注销（" + idHint + "，" + email + "）。",
+          users,
+          jobs,
+          apps,
+          evals,
+          notifs,
+          assigns,
+          favs,
+          cvFiles,
+          logs,
+          c,
+          settings);
 
       saveAll(users, jobs, apps, notifs, assigns, logs, c);
       saveEvaluationsUnsafe(evals);
@@ -1149,22 +1310,7 @@ public final class TaRecruitService {
         throw new ApiException(400, "Only closed or cancelled jobs can be deleted");
       }
       String moduleName = job.module_name != null ? job.module_name : "";
-      Set<Integer> appIds = apps.stream()
-          .filter(a -> a.job_id == jobId)
-          .map(a -> a.id)
-          .collect(Collectors.toSet());
-      jobs.removeIf(j -> j.id == jobId);
-      apps.removeIf(a -> a.job_id == jobId);
-      evals.removeIf(e -> e.job_id == jobId || appIds.contains(e.application_id));
-      notifs.removeIf(n ->
-          Objects.equals(n.link_job_id, jobId)
-              || (n.application_id != null && appIds.contains(n.application_id))
-              || (n.link_application_id != null && appIds.contains(n.link_application_id)));
-      assigns.removeIf(a -> a.job_id == jobId);
-      favs.removeIf(f -> f.job_id == jobId);
-      logs.removeIf(log ->
-          ("job".equals(log.entity_type) && log.entity_id != null && log.entity_id == jobId)
-              || ("application".equals(log.entity_type) && log.entity_id != null && appIds.contains(log.entity_id)));
+      cascadeRemoveMoJobUnsafe(jobId, jobs, apps, evals, notifs, assigns, favs, logs);
       logActivityUnsafe(logs, c, mo.id, "job_deleted", "job", jobId,
           Map.of("module_name", moduleName));
       saveAll(users, jobs, apps, notifs, assigns, logs, c);
@@ -2687,9 +2833,139 @@ public final class TaRecruitService {
     return job;
   }
 
+  /** Removes TA-scoped applications, CV files, favorites, assignments, and related rows. */
+  private void cascadeRemoveTaData(
+      int taUserId,
+      List<ApplicationRecord> apps,
+      List<ApplicationEvaluationRecord> evals,
+      List<NotificationRecord> notifs,
+      List<AssignmentRecord> assigns,
+      List<JobFavoriteRecord> favs,
+      List<CvFileRecord> cvFiles,
+      List<ActivityLogRecord> logs) {
+    Set<Integer> appIds = apps.stream()
+        .filter(a -> a.ta_user_id == taUserId)
+        .map(a -> a.id)
+        .collect(Collectors.toSet());
+    for (CvFileRecord cf : cvFiles) {
+      if (cf.user_id == taUserId) {
+        deleteCvPayloadFileBestEffort(cf);
+      }
+    }
+    apps.removeIf(a -> a.ta_user_id == taUserId);
+    evals.removeIf(e -> appIds.contains(e.application_id));
+    notifs.removeIf(n ->
+        n.user_id == taUserId
+            || (n.application_id != null && appIds.contains(n.application_id))
+            || (n.link_application_id != null && appIds.contains(n.link_application_id)));
+    assigns.removeIf(a -> a.ta_user_id == taUserId || appIds.contains(a.application_id));
+    favs.removeIf(f -> f.user_id == taUserId);
+    cvFiles.removeIf(f -> f.user_id == taUserId);
+    logs.removeIf(log ->
+        ("user".equals(log.entity_type) && log.entity_id != null && log.entity_id == taUserId)
+            || ("application".equals(log.entity_type)
+                && log.entity_id != null
+                && appIds.contains(log.entity_id)));
+  }
+
+  /** Removes one job and dependent rows; no status check (for admin force-delete). */
+  private static void cascadeRemoveMoJobUnsafe(
+      int jobId,
+      List<JobRecord> jobs,
+      List<ApplicationRecord> apps,
+      List<ApplicationEvaluationRecord> evals,
+      List<NotificationRecord> notifs,
+      List<AssignmentRecord> assigns,
+      List<JobFavoriteRecord> favs,
+      List<ActivityLogRecord> logs) {
+    Set<Integer> appIds = apps.stream()
+        .filter(a -> a.job_id == jobId)
+        .map(a -> a.id)
+        .collect(Collectors.toSet());
+    jobs.removeIf(j -> j.id == jobId);
+    apps.removeIf(a -> a.job_id == jobId);
+    evals.removeIf(e -> e.job_id == jobId || appIds.contains(e.application_id));
+    notifs.removeIf(n ->
+        Objects.equals(n.link_job_id, jobId)
+            || (n.application_id != null && appIds.contains(n.application_id))
+            || (n.link_application_id != null && appIds.contains(n.link_application_id)));
+    assigns.removeIf(a -> a.job_id == jobId);
+    favs.removeIf(f -> f.job_id == jobId);
+    logs.removeIf(log ->
+        ("job".equals(log.entity_type) && log.entity_id != null && log.entity_id == jobId)
+            || ("application".equals(log.entity_type)
+                && log.entity_id != null
+                && appIds.contains(log.entity_id)));
+  }
+
+  /**
+   * Deletes user row after role-specific cascades. When {@code forceDeleteMoJobs} is true, removes all
+   * MO-owned jobs regardless of status; otherwise MO must have no jobs (self-delete path).
+   */
+  private void cascadeRemoveUserData(
+      UserRecord target,
+      int actorUserId,
+      boolean forceDeleteMoJobs,
+      String logAction,
+      Map<String, Object> logPayload,
+      boolean notifyAdmins,
+      String notifyTitle,
+      String notifyBody,
+      List<UserRecord> users,
+      List<JobRecord> jobs,
+      List<ApplicationRecord> apps,
+      List<ApplicationEvaluationRecord> evals,
+      List<NotificationRecord> notifs,
+      List<AssignmentRecord> assigns,
+      List<JobFavoriteRecord> favs,
+      List<CvFileRecord> cvFiles,
+      List<ActivityLogRecord> logs,
+      Counters c,
+      SettingsRecord settings) {
+    if ("mo".equals(target.role) && forceDeleteMoJobs) {
+      List<Integer> jobIds = jobs.stream()
+          .filter(j -> j.created_by == target.id)
+          .map(j -> j.id)
+          .collect(Collectors.toList());
+      for (int jobId : jobIds) {
+        cascadeRemoveMoJobUnsafe(jobId, jobs, apps, evals, notifs, assigns, favs, logs);
+      }
+    }
+    cascadeRemoveTaData(target.id, apps, evals, notifs, assigns, favs, cvFiles, logs);
+    notifs.removeIf(n -> n.user_id == target.id);
+    if (notifyAdmins && settings.notifications_enabled) {
+      notifyAdminsUnsafe(notifs, users, settings, c, notifyTitle, notifyBody, "system");
+    }
+    users.removeIf(x -> x.id == target.id);
+    Map<String, Object> payload = new LinkedHashMap<>(logPayload);
+    logActivityUnsafe(logs, c, actorUserId, logAction, "user", target.id, payload);
+  }
+
+  private static Map<String, Object> adminUserOut(UserRecord u) {
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("id", u.id);
+    m.put("email", u.email);
+    m.put("role", u.role);
+    m.put("display_name", u.display_name);
+    m.put("student_id", u.student_id);
+    m.put("created_at", u.created_at);
+    m.put("disabled", u.disabled);
+    m.put("locked_until", u.locked_until);
+    m.put("failed_login_attempts", u.failed_login_attempts);
+    return m;
+  }
+
+  private static UserRecord findUserUnsafe(List<UserRecord> users, int userId) {
+    return users.stream().filter(x -> x.id == userId).findFirst().orElseThrow(
+        () -> new ApiException(404, "User not found"));
+  }
+
   private static UserRecord requireUserUnsafe(List<UserRecord> users, int userId) {
-    return users.stream().filter(u -> u.id == userId).findFirst().orElseThrow(
-        () -> new ApiException(401, "User not found"));
+    UserRecord u = findUserUnsafe(users, userId);
+    if (u.disabled) {
+      throw new ApiException(403, "账号已禁用");
+    }
+    return u;
   }
 
   private static UserRecord requireRole(UserRecord u, String role) {
