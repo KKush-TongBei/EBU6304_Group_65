@@ -117,6 +117,7 @@ export default function MOJobDetail() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [expandedEval, setExpandedEval] = useState<number | null>(null);
   const [evalDraft, setEvalDraft] = useState<EvalDraft | null>(null);
+  const [autoEvaluating, setAutoEvaluating] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<JobForm>({
@@ -379,6 +380,30 @@ export default function MOJobDetail() {
       loadApps();
     } catch (e: unknown) {
       toast(e instanceof Error ? e.message : "保存失败", "error");
+    }
+  };
+
+  const handleAutoEvaluate = async (applicationId: number) => {
+    try {
+      await api.mo.autoEvaluate(applicationId);
+      toast("自动评分已完成", "success");
+      loadApps();
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "自动评分失败", "error");
+    }
+  };
+
+  const handleAutoEvaluateAll = async () => {
+    if (!job) return;
+    setAutoEvaluating(true);
+    try {
+      await api.mo.autoEvaluateAll(job.id);
+      toast("批量自动评分已完成", "success");
+      loadApps();
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "批量自动评分失败", "error");
+    } finally {
+      setAutoEvaluating(false);
     }
   };
 
@@ -682,6 +707,9 @@ export default function MOJobDetail() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outlineInfo" className="!py-2" onClick={handleAutoEvaluateAll} disabled={autoEvaluating}>
+              {autoEvaluating ? "评估中..." : "批量自动评估"}
+            </Button>
             <Button type="button" variant="secondary" className="!py-2" onClick={() => batchDecide("interviewing")}>
               批量面试中
             </Button>
@@ -778,6 +806,14 @@ export default function MOJobDetail() {
                         >
                           <IconEye />
                           简历
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outlineInfo"
+                          className="!py-1.5 !px-2.5 text-xs"
+                          onClick={() => handleAutoEvaluate(a.id)}
+                        >
+                          自动评分
                         </Button>
                         <Button
                           type="button"
