@@ -1,4 +1,6 @@
 import { withAppBase } from "./appBase";
+import { getStoredLocale } from "./locales";
+import { translateApiMessage } from "./translateApiMessage";
 import type {
   ActivityLog,
   Application,
@@ -64,7 +66,7 @@ async function request<T>(
       /* ignore */
     }
     handleUnauthorizedRedirect(path, res.status, Boolean(token));
-    throw new Error(detail);
+    throw new Error(translateApiMessage(detail, getStoredLocale()));
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get("content-type");
@@ -313,7 +315,7 @@ export async function downloadWithAuth(url: string, filename: string): Promise<v
       detail = res.statusText || detail;
     }
     handleUnauthorizedRedirect(url, res.status, Boolean(token));
-    throw new Error(detail);
+    throw new Error(translateApiMessage(detail, getStoredLocale()));
   }
   const blob = await res.blob();
   const a = document.createElement("a");
