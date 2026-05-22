@@ -211,6 +211,14 @@ export const api = {
         method: "POST",
         json: body,
       }),
+    autoEvaluate: (applicationId: number) =>
+      request<Record<string, unknown>>(`/api/mo/applications/${applicationId}/auto-evaluation`, {
+        method: "POST",
+      }),
+    autoEvaluateAll: (jobId: number) =>
+      request<Record<string, unknown>[]>(`/api/mo/jobs/${jobId}/applications/auto-evaluate-all`, {
+        method: "POST",
+      }),
     decide: (applicationId: number, status: "interviewing" | "accepted" | "rejected") =>
       request<Application & { warnings?: string[] }>(`/api/mo/applications/${applicationId}`, {
         method: "PATCH",

@@ -1782,6 +1782,235 @@ public final class TaRecruitService {
     return 0;
   }
 
+  /**
+   * 自动评估TA申请：根据TA的资料和岗位要求自动计算各项评分
+   */
+  public Map<String, Object> autoEvaluateApplication(int moUserId, int applicationId) {
+    rw.writeLock().lock();
+    try {
+      List<UserRecord> users = readUsersUnsafe();
+      UserRecord mo = requireRole(requireUserUnsafe(users, moUserId), "mo");
+      List<JobRecord> jobs = readJobsUnsafe();
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      List<ApplicationEvaluationRecord> evals = readEvaluationsUnsafe();
+      List<ActivityLogRecord> logs = readLogsUnsafe();
+      Counters c = readCountersUnsafe();
+
+      ApplicationRecord app = apps.stream().filter(a -> a.id == applicationId).findFirst().orElseThrow(
+          () -> new ApiException(404, "Application not found"));
+      ensureOwnJob(jobs, app.job_id, mo.id);
+
+      JobRecord job = jobs.stream().filter(j -> j.id == app.job_id).findFirst().orElseThrow(
+          () -> new ApiException(404, "Job not found"));
+
+      UserRecord ta = users.stream().filter(u -> u.id == app.ta_user_id).findFirst().orElseThrow(
+          () -> new ApiException(404, "TA not found"));
+
+      int skillMatch = calculateSkillMatch(ta, job);
+      int courseExperience = calculateCourseExperience(ta, job);
+      int academicBackground = calculateAcademicBackground(ta);
+      int availabilityScore = calculateAvailabilityScore(ta, job);
+      int communication = calculateCommunication(ta);
+
+      ApplicationEvaluationRecord ev = findEvaluation(evals, applicationId);
+      if (ev == null) {
+        ev = new ApplicationEvaluationRecord();
+        ev.id = c.evaluationSeq++;
+        ev.application_id = applicationId;
+        ev.job_id = app.job_id;
+        evals.add(ev);
+      }
+
+      ev.skill_match = skillMatch;
+      ev.course_experience = courseExperience;
+      ev.academic_background = academicBackground;
+      ev.availability_score = availabilityScore;
+      ev.communication = communication;
+      ev.total_note = "自动评估生成";
+      ev.label = suggestLabel(skillMatch, courseExperience, academicBackground, availabilityScore, communication);
+      ev.decision_note = "";
+      ev.updated_by = mo.id;
+      ev.updated_at = Instant.now();
+
+      saveEvaluationsUnsafe(evals);
+      logActivityUnsafe(logs, c, mo.id, "evaluation_auto_generated", "application", applicationId, Map.of());
+      saveAll(null, null, null, null, null, logs, c);
+
+      return evaluationToMap(ev);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
+  /**
+   * 批量自动评估某个岗位的所有申请
+   */
+  public List<Map<String, Object>> autoEvaluateJobApplications(int moUserId, int jobId) {
+    rw.writeLock().lock();
+    try {
+      List<UserRecord> users = readUsersUnsafe();
+      requireRole(requireUserUnsafe(users, moUserId), "mo");
+      List<JobRecord> jobs = readJobsUnsafe();
+      ensureOwnJob(jobs, jobId, moUserId);
+
+      List<ApplicationRecord> apps = readApplicationsUnsafe();
+      List<Map<String, Object>> results = new ArrayList<>();
+
+      for (ApplicationRecord app : apps) {
+        if (app.job_id == jobId && "pending".equals(app.status)) {
+          results.add(autoEvaluateApplication(moUserId, app.id));
+        }
+      }
+
+      return results;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      rw.writeLock().unlock();
+    }
+  }
+
+  private static int calculateSkillMatch(UserRecord ta, JobRecord job) {
+    List<String> taSkills = ta.profile_skills != null ? ta.profile_skills : List.of();
+    String jobTags = job.skill_tags != null ? job.skill_tags.toLowerCase(Locale.ROOT) : "";
+
+    if (taSkills.isEmpty() || jobTags.isBlank()) {
+      return 2;
+    }
+
+    String[] jobSkillList = jobTags.split(",");
+    int matchCount = 0;
+    int totalJobSkills = jobSkillList.length;
+
+    for (String jobSkill : jobSkillList) {
+      String cleanJobSkill = jobSkill.trim().toLowerCase(Locale.ROOT);
+      if (cleanJobSkill.isEmpty()) continue;
+      for (String taSkill : taSkills) {
+        if (taSkill.toLowerCase(Locale.ROOT).contains(cleanJobSkill) || cleanJobSkill.contains(taSkill.toLowerCase(Locale.ROOT))) {
+          matchCount++;
+          break;
+        }
+      }
+    }
+
+    if (totalJobSkills == 0) return 2;
+
+    double matchRatio = (double) matchCount / totalJobSkills;
+    if (matchRatio >= 0.8) return 5;
+    if (matchRatio >= 0.6) return 4;
+    if (matchRatio >= 0.4) return 3;
+    if (matchRatio >= 0.2) return 2;
+    return 1;
+  }
+
+  private static int calculateCourseExperience(UserRecord ta, JobRecord job) {
+    String taHistory = ta.ta_history != null ? ta.ta_history.toLowerCase(Locale.ROOT) : "";
+    String preferredCourses = ta.preferred_courses != null ? ta.preferred_courses.toLowerCase(Locale.ROOT) : "";
+    String moduleName = job.module_name != null ? job.module_name.toLowerCase(Locale.ROOT) : "";
+
+    int score = 1;
+
+    if (!taHistory.isBlank() && !moduleName.isBlank()) {
+      if (taHistory.contains(moduleName)) {
+        score += 2;
+      } else if (taHistory.contains("ta") || taHistory.contains("teaching") || taHistory.contains("助教")) {
+        score += 1;
+      }
+    }
+
+    if (!preferredCourses.isBlank() && !moduleName.isBlank()) {
+      if (preferredCourses.contains(moduleName)) {
+        score += 2;
+      }
+    }
+
+    return Math.min(5, score);
+  }
+
+  private static int calculateAcademicBackground(UserRecord ta) {
+    String gpaStr = ta.gpa != null ? ta.gpa.trim() : "";
+
+    if (gpaStr.isBlank()) {
+      return 2;
+    }
+
+    try {
+      double gpa = Double.parseDouble(gpaStr);
+      if (gpa >= 3.8 || gpa >= 95) return 5;
+      if (gpa >= 3.5 || gpa >= 90) return 4;
+      if (gpa >= 3.0 || gpa >= 80) return 3;
+      if (gpa >= 2.5 || gpa >= 70) return 2;
+      if (gpa >= 2.0 || gpa >= 60) return 1;
+      return 0;
+    } catch (NumberFormatException e) {
+      return 2;
+    }
+  }
+
+  private static int calculateAvailabilityScore(UserRecord ta, JobRecord job) {
+    String availability = ta.availability_json != null ? ta.availability_json : "";
+    double maxHours = ta.max_weekly_hours;
+    double jobHours = job.assigned_hours;
+
+    int score = 2;
+
+    if (!availability.isBlank() && !availability.equals("{}") && !availability.equals("[]")) {
+      score += 1;
+    }
+
+    if (maxHours > 0) {
+      if (maxHours >= jobHours * 2) {
+        score += 2;
+      } else if (maxHours >= jobHours) {
+        score += 1;
+      }
+    }
+
+    return Math.min(5, score);
+  }
+
+  private static int calculateCommunication(UserRecord ta) {
+    String languages = ta.languages != null ? ta.languages.toLowerCase(Locale.ROOT) : "";
+    String certificates = ta.certificates != null ? ta.certificates.toLowerCase(Locale.ROOT) : "";
+
+    int score = 2;
+
+    if (!languages.isBlank()) {
+      int langCount = languages.split(",").length;
+      if (langCount >= 3) {
+        score += 2;
+      } else if (langCount >= 2) {
+        score += 1;
+      }
+
+      if (languages.contains("english") || languages.contains("英语") || languages.contains("en")) {
+        score += 1;
+      }
+    }
+
+    if (!certificates.isBlank()) {
+      if (certificates.contains("ielts") || certificates.contains("雅思") ||
+          certificates.contains("toefl") || certificates.contains("托福") ||
+          certificates.contains("六级") || certificates.contains("cet6")) {
+        score += 1;
+      }
+    }
+
+    return Math.min(5, score);
+  }
+
+  private static String suggestLabel(int skill, int course, int academic, int availability, int communication) {
+    int total = skill + course + academic + availability + communication;
+    double avg = total / 5.0;
+
+    if (avg >= 4.0) return "优秀";
+    if (avg >= 3.0) return "良好";
+    if (avg >= 2.0) return "一般";
+    return "待评估";
+  }
+
   public Map<String, Object> taToggleFavorite(int userId, int jobId) {
     rw.writeLock().lock();
     try {
