@@ -1,3 +1,5 @@
+import { getStoredLocale, translate } from "../locales";
+
 export interface FileValidationResult {
   isValid: boolean;
   error?: string;
@@ -24,16 +26,21 @@ export function validateFile(
   options: FileValidationOptions = {}
 ): FileValidationResult {
   const opts = { ...DEFAULT_OPTIONS, ...options };
+  const locale = getStoredLocale();
+  const ext = opts.allowedExtensions?.join(", ") ?? "";
 
   if (!file) {
-    return { isValid: false, error: "请选择文件" };
+    return { isValid: false, error: translate(locale, "common.selectFile") };
   }
 
   const sizeMB = file.size / (1024 * 1024);
   if (opts.maxSizeMB && sizeMB > opts.maxSizeMB) {
     return {
       isValid: false,
-      error: `文件过大，最大支持 ${opts.maxSizeMB}MB（当前 ${sizeMB.toFixed(2)}MB）`,
+      error: translate(locale, "common.fileTooBig", {
+        max: opts.maxSizeMB,
+        current: sizeMB.toFixed(2),
+      }),
     };
   }
 
@@ -44,20 +51,20 @@ export function validateFile(
     if (!isMimeValid) {
       return {
         isValid: false,
-        error: `不支持的文件类型，请上传 ${opts.allowedExtensions?.join(", ")} 格式`,
+        error: translate(locale, "common.fileTypeInvalid", { ext }),
       };
     }
   }
 
   if (opts.allowedExtensions && opts.allowedExtensions.length > 0) {
     const fileName = file.name.toLowerCase();
-    const hasValidExtension = opts.allowedExtensions.some((ext) =>
-      fileName.endsWith(ext.toLowerCase())
+    const hasValidExtension = opts.allowedExtensions.some((e) =>
+      fileName.endsWith(e.toLowerCase())
     );
     if (!hasValidExtension) {
       return {
         isValid: false,
-        error: `不支持的文件扩展名，请上传 ${opts.allowedExtensions?.join(", ")} 格式`,
+        error: translate(locale, "common.fileExtInvalid", { ext }),
       };
     }
   }
