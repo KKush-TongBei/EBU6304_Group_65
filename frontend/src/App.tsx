@@ -1,3 +1,4 @@
+/** 应用根组件：路由表、认证/主题/语言 Provider，按角色划分 TA/MO/Admin 页面。 */
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { routerBasename } from "./appBase";
 import { AuthProvider } from "./AuthContext";

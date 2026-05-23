@@ -1,3 +1,4 @@
+/** 活动审计日志页：分页拉取 {@code activity_logs}，支持 CSV 导出。 */
 import { useEffect, useState } from "react";
 import { api, downloadWithAuth } from "../../api";
 import { useFeedback } from "../../feedback";

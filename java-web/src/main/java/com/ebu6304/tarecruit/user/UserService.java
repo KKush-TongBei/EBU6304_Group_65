@@ -8,7 +8,8 @@ import java.time.Instant;
 import java.util.Locale;
 
 /**
- * Business logic around registration/login backed by JSON file storage.
+ * 用户账号业务：注册、登录验密、持久化到 {@code users.json}。
+ * 注册时对密码做 BCrypt 哈希；{@link #requirePassword} 要求至少 8 位且含字母与数字（弱密码基础校验）。
  */
 public final class UserService {
   private final UserDAO dao;
@@ -174,6 +175,7 @@ public final class UserService {
     }
   }
 
+  /** 弱密码检测：至少 8 位且同时包含字母与数字。 */
   private static void requirePassword(String plainPassword) {
     if (plainPassword == null || plainPassword.length() < 8) {
       throw new IllegalArgumentException("password must be at least 8 chars");

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.Instant;
 
+/** MO 对某条申请的结构化评分/评语。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class ApplicationEvaluationRecord {
   public int id;

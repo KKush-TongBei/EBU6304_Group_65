@@ -1,3 +1,4 @@
+/** 带错误边界与网络状态横幅的路由包装（可选入口，与 App.tsx 路由表一致）。 */
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./AuthContext";
 import { FeedbackProvider } from "./feedback";

@@ -1,3 +1,4 @@
+/** 营销/落地首页：未登录入口，已登录用户按角色跳转工作台。 */
 import { Link } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useLocale } from "../locale";

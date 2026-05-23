@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/** 岗位描述模板集合：对应 {@code job_templates.json} 根结构。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class JobTemplatesFile {
   public List<Map<String, Object>> built_ins = new ArrayList<>();

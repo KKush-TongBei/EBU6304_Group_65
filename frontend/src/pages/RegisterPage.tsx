@@ -1,3 +1,4 @@
+/** 公开注册页：TA/MO 注册，前端做基础密码强度提示（后端 BCrypt + 弱密码校验）。 */
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";

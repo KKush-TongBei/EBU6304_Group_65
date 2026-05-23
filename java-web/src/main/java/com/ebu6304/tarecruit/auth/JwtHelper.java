@@ -9,6 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 
+/**
+ * JWT 签发与校验：登录成功后生成 Bearer Token（subject 为用户 id），过滤器据此识别当前用户。
+ */
 public final class JwtHelper {
   private final SecretKey key;
   private final long expireMinutes;
