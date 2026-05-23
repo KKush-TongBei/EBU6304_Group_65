@@ -1,42 +1,36 @@
 import type { Locale } from "./locales";
 import { translate } from "./locales";
 
-/**
- * 将后端 API 的 {@code detail} 文案在英文模式下映射为英文（含中文错误与校验提示）。
- */
-const ZH_TO_EN: Record<string, string> = {
-  "Invalid email or password": "Invalid email or password",
-  "账号已禁用": "Account is disabled",
-  "Not authenticated": "Not authenticated",
-  "Forbidden": "Forbidden",
-  "User not found": "User not found",
-  "Internal server error": "Internal server error",
-  "Service unavailable": "Service unavailable",
-  "Data store temporarily unavailable. Please retry later.":
-    "Data store temporarily unavailable. Please retry later.",
-  "email required": "Email is required",
-  "email: invalid format": "Invalid email format",
-  "email: too long": "Email is too long",
-  "password: at least 8 characters": "Password must be at least 8 characters",
-  "password: must contain both letters and digits":
-    "Password must contain both letters and digits",
-  "password must be at least 8 chars": "Password must be at least 8 characters",
-  "password must contain letters and digits":
-    "Password must contain both letters and digits",
-  "Email already registered": "Email already registered",
-  "email already exists": "Email already exists",
-  "student_id is required for TA": "Student ID is required for TA",
-  "MO accounts require staff_id": "Staff ID is required for MO",
-  "role must be mo or admin": "Role must be MO or Admin",
-  "不能禁用管理员账号": "Administrator accounts cannot be disabled",
-  "管理员账号不可自行注销": "Admin accounts cannot be self-deleted",
-  "密码错误": "Incorrect password",
-  "No supported fields to update": "No supported fields to update",
-  "下载失败": "Download failed",
+/** 后端 {@code detail} 固定文案 → locales 中的 {@code apiErrors.*} 键。 */
+const MESSAGE_TO_I18N_KEY: Record<string, string> = {
+  "Data store temporarily unavailable. Please retry later.": "apiErrors.dataStoreUnavailable",
+  "Internal server error": "apiErrors.internalServerError",
+  "Service unavailable": "apiErrors.serviceUnavailable",
+  "Not authenticated": "apiErrors.notAuthenticated",
+  "Forbidden": "apiErrors.forbidden",
+  "User not found": "apiErrors.userNotFound",
+  "Invalid email or password": "apiErrors.invalidCredentials",
+  "账号已禁用": "apiErrors.accountDisabled",
+  "密码错误": "apiErrors.incorrectPassword",
+  "email required": "apiErrors.emailRequired",
+  "email: invalid format": "apiErrors.invalidEmailFormat",
+  "email: too long": "apiErrors.emailTooLong",
+  "password: at least 8 characters": "apiErrors.passwordTooShort",
+  "password: must contain both letters and digits": "apiErrors.passwordNeedsLettersDigits",
+  "password must be at least 8 chars": "apiErrors.passwordTooShort",
+  "password must contain letters and digits": "apiErrors.passwordNeedsLettersDigits",
+  "Email already registered": "apiErrors.emailAlreadyRegistered",
+  "email already exists": "apiErrors.emailAlreadyExists",
+  "student_id is required for TA": "apiErrors.studentIdRequiredTa",
+  "MO accounts require staff_id": "apiErrors.staffIdRequiredMo",
+  "role must be mo or admin": "apiErrors.roleMustBeMoOrAdmin",
+  "不能禁用管理员账号": "apiErrors.cannotDisableAdmin",
+  "管理员账号不可自行注销": "apiErrors.adminCannotSelfDelete",
+  "No supported fields to update": "apiErrors.noSupportedFields",
+  "下载失败": "apiErrors.downloadFailed",
 };
 
-const LOCKOUT_RE =
-  /^账号已暂时锁定，约 (\d+) 分钟后可重试$/;
+const LOCKOUT_ZH_RE = /^账号已暂时锁定，约 (\d+) 分钟后可重试$/;
 
 /** Backend dashboard `risk_alerts` strings (Chinese) → localized copy. */
 const RISK_OVERLOAD_ZH =
@@ -52,15 +46,20 @@ export function translateDashboardRiskAlert(message: string, locale: Locale): st
 }
 
 export function translateApiMessage(message: string, locale: Locale): string {
-  if (locale !== "en" || !message) return message;
-  const exact = ZH_TO_EN[message];
-  if (exact) return exact;
-  const lock = message.match(LOCKOUT_RE);
-  if (lock) {
-    return `Account temporarily locked. Try again in about ${lock[1]} minute(s).`;
+  if (!message) return message;
+
+  const key = MESSAGE_TO_I18N_KEY[message];
+  if (key) return translate(locale, key);
+
+  const lockZh = message.match(LOCKOUT_ZH_RE);
+  if (lockZh) {
+    return translate(locale, "apiErrors.accountLocked", { minutes: lockZh[1] });
   }
-  if (message.startsWith("email:")) return message.replace(/^email:/, "Email:");
-  if (message.startsWith("password:")) return message.replace(/^password:/, "Password:");
-  if (message.includes("max ") && message.includes("characters")) return message;
+
+  if (locale === "en") {
+    if (message.startsWith("email:")) return message.replace(/^email:/, "Email:");
+    if (message.startsWith("password:")) return message.replace(/^password:/, "Password:");
+  }
+
   return message;
 }

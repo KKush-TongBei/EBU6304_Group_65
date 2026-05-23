@@ -1,8 +1,9 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  base: "/ta-recruit/",        
+  base: "/ta-recruit/",
   plugins: [react()],
   server: {
     port: 5173,
@@ -13,5 +14,10 @@ export default defineConfig({
         rewrite: (path) => `/ta-recruit${path}`,
       },
     },
+  },
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    setupFiles: ["src/test/setup.ts"],
   },
 });
