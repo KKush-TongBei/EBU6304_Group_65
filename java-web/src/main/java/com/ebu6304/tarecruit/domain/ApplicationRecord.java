@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.Instant;
 
+/** 岗位申请实体：对应 {@code applications.json} 中单条记录。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class ApplicationRecord {
   public int id;

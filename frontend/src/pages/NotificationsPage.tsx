@@ -1,3 +1,4 @@
+/** 站内通知列表：拉取、已读标记，英文模式下翻译 title/body 模板。 */
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";

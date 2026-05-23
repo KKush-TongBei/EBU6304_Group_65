@@ -1,3 +1,4 @@
+/** MO 岗位列表：查看自己发布的招聘。 */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";

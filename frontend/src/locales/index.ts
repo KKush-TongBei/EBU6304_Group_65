@@ -1,3 +1,4 @@
+/** 多语言目录入口：按 locale 查找文案键，持久化到 localStorage。 */
 import { en } from "./en";
 import { zh, type Messages } from "./zh";
 

@@ -1,3 +1,4 @@
+/** React 错误边界：捕获子树渲染异常并展示友好错误页。 */
 import { Component, ReactNode } from "react";
 import { withAppBase } from "../appBase";
 import { translate, getStoredLocale } from "../locales";

@@ -1,3 +1,4 @@
+/** 监听浏览器在线/离线状态，供 NetworkStatus 横幅提示。 */
 import { useState, useEffect } from "react";
 
 export function useNetworkStatus(): {

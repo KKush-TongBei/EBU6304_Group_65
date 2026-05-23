@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/** 用户实体：对应 {@code users.json} 中单条记录（含 password_hash、角色、登录失败计数等）。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class UserRecord {
   public int id;

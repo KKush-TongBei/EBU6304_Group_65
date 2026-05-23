@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.Instant;
 
+/** 站内通知实体：对应 {@code notifications.json} 中单条记录。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class NotificationRecord {
   public int id;

@@ -1,3 +1,4 @@
+/** 通用 UI 组件：按钮、输入框、卡片、状态徽章、页面加载等（含 i18n）。 */
 import {
   forwardRef,
   type ButtonHTMLAttributes,

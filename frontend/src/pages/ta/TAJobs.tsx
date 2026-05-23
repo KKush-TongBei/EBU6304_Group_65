@@ -1,3 +1,4 @@
+/** TA 岗位浏览：筛选、收藏、投递申请。 */
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import { useAuth } from "../../AuthContext";

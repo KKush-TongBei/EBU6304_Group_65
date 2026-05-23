@@ -1,3 +1,4 @@
+/** 前端上传校验：简历文件大小、MIME 类型与扩展名（与后端 Multipart 限制一致）。 */
 import { getStoredLocale, translate } from "../locales";
 
 export interface FileValidationResult {

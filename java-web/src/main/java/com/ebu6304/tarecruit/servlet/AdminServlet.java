@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** 管理员 API：用户治理、活动日志、系统设置、风险看板等。 */
 @WebServlet("/api/admin/*")
 public final class AdminServlet extends JsonServlet {
   private static final Pattern USER_ID = Pattern.compile("^/users/(\\d+)$");

@@ -1,3 +1,4 @@
+/** MO 账号设置：改密与注销。 */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, setToken } from "../../api";

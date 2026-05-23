@@ -1,3 +1,4 @@
+/** 深浅色主题 Context：读写 localStorage 并切换 {@code document.documentElement} class。 */
 import {
   createContext,
   useCallback,

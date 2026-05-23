@@ -1,3 +1,4 @@
+/** 全局 Toast/反馈提示：各页面通过 Context 弹出成功或错误消息。 */
 import {
   createContext,
   useCallback,

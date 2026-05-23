@@ -9,6 +9,7 @@ import jakarta.servlet.annotation.WebListener;
 import java.io.IOException;
 import java.nio.file.Path;
 
+/** 应用启动监听器：初始化 {@link TaRecruitService} 并挂到 ServletContext，供各 Servlet 获取。 */
 @WebListener
 public final class TaRecruitBootstrap implements ServletContextListener {
   /**

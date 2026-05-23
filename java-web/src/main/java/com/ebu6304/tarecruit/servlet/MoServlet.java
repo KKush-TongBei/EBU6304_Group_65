@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** 课程负责人（MO）端 API：发布岗位、审阅申请、评分与录用等。 */
 @WebServlet("/api/mo/*")
 public final class MoServlet extends JsonServlet {
   private static final Pattern JOB_ID = Pattern.compile("^/jobs/(\\d+)$");
