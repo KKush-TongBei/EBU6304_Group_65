@@ -1,7 +1,9 @@
+/** MO 岗位详情：申请列表、评分、录用/拒绝、下载简历。 */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, downloadWithAuth } from "../../api";
 import { useFeedback } from "../../feedback";
+import { useLocale } from "../../locale";
 import type { Application, Job, JobStatus } from "../../types";
 import AppShell from "../../AppShell";
 import {
@@ -109,6 +111,7 @@ export default function MOJobDetail() {
   const jobId = Number(id);
   const nav = useNavigate();
   const { toast, confirm } = useFeedback();
+  const { t, te } = useLocale();
   const [job, setJob] = useState<Job | null>(null);
   const [apps, setApps] = useState<Application[]>([]);
   const [appSort, setAppSort] = useState<string>("");
@@ -221,61 +224,60 @@ export default function MOJobDetail() {
       setJob(j as Job);
       setForm(jobToForm(j as Job));
       setEditing(false);
-      toast("岗位已更新", "success");
+      toast(t("mo.jobUpdated"), "success");
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "保存失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("common.saveFailed"), "error");
     }
   };
 
   const closeJob = async () => {
     if (!job) return;
     const ok = await confirm({
-      title: "关闭岗位",
-      message: "关闭后学生无法再申请该岗位，确定继续？",
-      confirmText: "关闭",
+      title: t("mo.closeJobTitle"),
+      message: t("mo.closeJobMsg"),
+      confirmText: t("mo.closeJob"),
       danger: true,
     });
     if (!ok) return;
     try {
       const j = await api.mo.closeJob(job.id);
       setJob(j as Job);
-      toast("岗位已关闭", "success");
+      toast(t("mo.jobClosed"), "success");
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "操作失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("common.opFailed"), "error");
     }
   };
 
   const deleteJobRecord = async () => {
     if (!job) return;
     const ok = await confirm({
-      title: "删除岗位记录",
-      message:
-        "将永久删除该岗位及其所有申请、评分与相关通知等本地数据，且不可恢复（不会删除申请人账号及其简历文件）。确定继续？",
-      confirmText: "删除",
+      title: t("mo.deleteJobTitle"),
+      message: t("mo.deleteJobMsg"),
+      confirmText: t("common.delete"),
       danger: true,
     });
     if (!ok) return;
     try {
       await api.mo.deleteJob(job.id);
-      toast("岗位记录已删除", "success");
+      toast(t("mo.jobDeleted"), "success");
       nav("/mo/jobs");
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "删除失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("common.deleteFailed"), "error");
     }
   };
 
   const doTransition = async () => {
     if (!job || !transitionTo) {
-      toast("请选择目标状态", "error");
+      toast(t("mo.selectTargetStatus"), "error");
       return;
     }
     try {
       const j = await api.mo.transitionJob(job.id, transitionTo);
       setJob(j as Job);
-      toast("状态已更新", "success");
+      toast(t("mo.statusUpdated"), "success");
       loadApps();
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "状态流转失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("mo.statusFlowFailed"), "error");
     }
   };
 
@@ -283,36 +285,48 @@ export default function MOJobDetail() {
     if (!job) return;
     try {
       await downloadWithAuth(api.mo.exportCsvUrl(job.id), `job_${job.id}.csv`);
-      toast("导出成功", "success");
+      toast(t("common.exportSuccess"), "success");
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "导出失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("common.exportFailed"), "error");
     }
   };
 
   const decide = async (appId: number, status: "interviewing" | "accepted" | "rejected") => {
     const ok = await confirm({
       title:
-        status === "interviewing" ? "推进至面试中" : status === "accepted" ? "录用申请人" : "拒绝申请人",
+        status === "interviewing"
+          ? t("mo.advanceInterview")
+          : status === "accepted"
+            ? t("mo.acceptApplicant")
+            : t("mo.rejectApplicant"),
       message:
         status === "interviewing"
-          ? "确认将该申请推进到面试中？"
+          ? t("mo.confirmAdvanceInterview")
           : status === "accepted"
-          ? "确认录用该申请人？"
-          : "确认拒绝该申请人？",
-      confirmText: status === "interviewing" ? "推进" : status === "accepted" ? "录用" : "拒绝",
+            ? t("mo.confirmAccept")
+            : t("mo.confirmReject"),
+      confirmText:
+        status === "interviewing" ? t("mo.advance") : status === "accepted" ? t("mo.accept") : t("mo.reject"),
       danger: status === "rejected",
     });
     if (!ok) return;
     try {
       const res = await api.mo.decide(appId, status);
-      toast(status === "interviewing" ? "已进入面试中" : status === "accepted" ? "已录用" : "已拒绝", "success");
+      toast(
+        status === "interviewing"
+          ? t("mo.enteredInterview")
+          : status === "accepted"
+            ? t("mo.accepted")
+            : t("mo.rejected"),
+        "success"
+      );
       if (res.warnings?.length) {
         toast(res.warnings.join("；"), "info");
       }
       loadJob();
       loadApps();
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "操作失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("common.opFailed"), "error");
     }
   };
 
@@ -327,21 +341,32 @@ export default function MOJobDetail() {
 
   const batchDecide = async (status: "interviewing" | "accepted" | "rejected") => {
     if (!job || selected.size === 0) {
-      toast("请先勾选待处理的申请", "error");
+      toast(t("mo.selectPendingFirst"), "error");
       return;
     }
     const ok = await confirm({
-      title: status === "interviewing" ? "批量推进至面试中" : status === "accepted" ? "批量录用" : "批量拒绝",
-      message: `将对 ${selected.size} 条申请执行${
-        status === "interviewing" ? "推进到面试中" : status === "accepted" ? "录用" : "拒绝"
-      }，继续？`,
-      confirmText: "继续",
+      title:
+        status === "interviewing"
+          ? t("mo.batchAdvance")
+          : status === "accepted"
+            ? t("mo.batchAccept")
+            : t("mo.batchReject"),
+      message: t("mo.batchMsg", {
+        count: selected.size,
+        action:
+          status === "interviewing"
+            ? t("mo.toInterviewing")
+            : status === "accepted"
+              ? t("mo.accept")
+              : t("mo.reject"),
+      }),
+      confirmText: t("common.continue"),
       danger: status === "rejected",
     });
     if (!ok) return;
     try {
       const res = await api.mo.batchDecide(job.id, Array.from(selected), status);
-      toast(`已处理 ${res.updated} 条`, res.errors.length ? "info" : "success");
+      toast(t("mo.processedCount", { count: res.updated }), res.errors.length ? "info" : "success");
       if (res.errors.length) {
         toast(res.errors.slice(0, 5).join("；") + (res.errors.length > 5 ? "…" : ""), "error");
       }
@@ -349,7 +374,7 @@ export default function MOJobDetail() {
       loadJob();
       loadApps();
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "批量操作失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("mo.batchOpFailed"), "error");
     }
   };
 
@@ -376,20 +401,20 @@ export default function MOJobDetail() {
         decision_note: evalDraft.decision_note || undefined,
         total_note: evalDraft.total_note || undefined,
       });
-      toast("评分已保存", "success");
+      toast(t("mo.evalSaved"), "success");
       loadApps();
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "保存失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("common.saveFailed"), "error");
     }
   };
 
   const handleAutoEvaluate = async (applicationId: number) => {
     try {
       await api.mo.autoEvaluate(applicationId);
-      toast("自动评分已完成", "success");
+      toast(t("mo.autoEvalDone"), "success");
       loadApps();
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "自动评分失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("mo.autoEvalFailed"), "error");
     }
   };
 
@@ -398,10 +423,10 @@ export default function MOJobDetail() {
     setAutoEvaluating(true);
     try {
       await api.mo.autoEvaluateAll(job.id);
-      toast("批量自动评分已完成", "success");
+      toast(t("mo.batchAutoEvalDone"), "success");
       loadApps();
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "批量自动评分失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("mo.batchAutoEvalFailed"), "error");
     } finally {
       setAutoEvaluating(false);
     }
@@ -423,38 +448,38 @@ export default function MOJobDetail() {
 
   const downloadApplicantCv = async (a: Application) => {
     if (!a.ta_cv_file_id) {
-      toast("该申请人尚未上传简历", "info");
+      toast(t("mo.noResume"), "info");
       return;
     }
     const name = a.ta_cv_original_name?.trim() || `application_${a.id}_cv`;
     try {
       await downloadWithAuth(api.mo.applicantCvDownloadUrl(a.id), name);
-      toast("已开始下载", "success");
+      toast(t("common.downloadStarted"), "success");
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "下载失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("common.downloadFailed"), "error");
     }
   };
 
-  const jobTypeLabel = (t: string | undefined) => {
-    if (t === "invigilation") return "监考";
-    if (t === "event_support") return "活动支持";
-    return "课程 TA";
+  const jobTypeLabel = (jobType: string | undefined) => {
+    if (jobType === "invigilation") return t("mo.jobTypeInvigilation");
+    if (jobType === "event_support") return t("mo.jobTypeEvent");
+    return t("mo.jobTypeCourseTa");
   };
 
   if (!jobId || Number.isNaN(jobId)) {
     return (
-      <AppShell title="岗位" role="mo">
-        <p className="text-ink-700 dark:text-slate-200">无效 ID</p>
+      <AppShell title={t("shell.titleJob")} role="mo">
+        <p className="text-ink-700 dark:text-slate-200">{t("common.invalidId")}</p>
       </AppShell>
     );
   }
 
   if (!job) {
     return (
-      <AppShell title="岗位" role="mo">
-        <p className="text-ink-500 dark:text-slate-400">加载中或未找到该岗位…</p>
+      <AppShell title={t("shell.titleJob")} role="mo">
+        <p className="text-ink-500 dark:text-slate-400">{t("common.notFoundLoading")}</p>
         <Link to="/mo/jobs" className="text-accent text-sm mt-4 inline-block">
-          返回列表
+          {t("common.backToList")}
         </Link>
       </AppShell>
     );
@@ -464,7 +489,7 @@ export default function MOJobDetail() {
     <AppShell title={job.module_name} role="mo">
       <div className="mb-4">
         <Link to="/mo/jobs" className="text-sm text-accent hover:underline">
-          ← 返回岗位列表
+          {t("mo.backToJobList")}
         </Link>
       </div>
 
@@ -472,39 +497,42 @@ export default function MOJobDetail() {
         <h1 className="font-display text-2xl md:text-3xl font-bold text-ink-950 dark:text-white tracking-tight">
           {job.module_name}
         </h1>
-        <p className="text-sm text-ink-500 dark:text-slate-400 mt-1">查看与处理本岗位的助教申请</p>
+        <p className="text-sm text-ink-500 dark:text-slate-400 mt-1">{t("mo.viewApplicationsHint")}</p>
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <StatCard title="申请总数" value={appStats.total} tone="neutral" />
-        <StatCard title="已申请" value={appStats.pending} tone="warn" />
-        <StatCard title="面试中" value={appStats.interviewing} tone="neutral" />
-        <StatCard title="已录用" value={appStats.accepted} tone="ok" />
-        <StatCard title="已拒绝" value={appStats.rejected} tone="bad" />
+        <StatCard title={t("mo.totalApps")} value={appStats.total} tone="neutral" />
+        <StatCard title={t("mo.statPending")} value={appStats.pending} tone="warn" />
+        <StatCard title={t("mo.statInterviewing")} value={appStats.interviewing} tone="neutral" />
+        <StatCard title={t("mo.statAccepted")} value={appStats.accepted} tone="ok" />
+        <StatCard title={t("mo.statRejected")} value={appStats.rejected} tone="bad" />
       </div>
 
       <Card className="p-4 mb-4 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/50">
-        <p className="text-xs font-semibold text-ink-700 dark:text-slate-300 mb-2">招聘管道与申请概览</p>
+        <p className="text-xs font-semibold text-ink-700 dark:text-slate-300 mb-2">{t("mo.pipelineOverview")}</p>
         <div className="flex flex-wrap gap-3 text-sm text-ink-600 dark:text-slate-300">
           <span>
-            当前阶段：<strong className="text-ink-950 dark:text-white">{job.status}</strong>
+            {t("mo.currentStageLabel")}
+            <strong className="text-ink-950 dark:text-white">{job.status}</strong>
           </span>
           <span>
-            已申请：<strong>{apps.filter((a) => a.status === "pending").length}</strong>
+            {t("mo.appliedCount")}
+            <strong>{apps.filter((a) => a.status === "pending").length}</strong>
           </span>
           <span>
-            面试中：<strong>{apps.filter((a) => a.status === "interviewing").length}</strong>
+            {t("mo.interviewingCount")}
+            <strong>{apps.filter((a) => a.status === "interviewing").length}</strong>
           </span>
           <span>
-            已录用：<strong>{apps.filter((a) => a.status === "accepted").length}</strong>
+            {t("mo.acceptedCount")}
+            <strong>{apps.filter((a) => a.status === "accepted").length}</strong>
           </span>
           <span>
-            已拒绝：<strong>{apps.filter((a) => a.status === "rejected").length}</strong>
+            {t("mo.rejectedCount")}
+            <strong>{apps.filter((a) => a.status === "rejected").length}</strong>
           </span>
         </div>
-        <p className="text-xs text-ink-500 dark:text-slate-400 mt-2">
-          推进流程请使用下方「推进流程」。若无下拉选项，表示已至终态或需先关闭岗位。
-        </p>
+        <p className="text-xs text-ink-500 dark:text-slate-400 mt-2">{t("mo.advanceHint")}</p>
       </Card>
 
       <Card className="p-6 mb-6">
@@ -512,33 +540,38 @@ export default function MOJobDetail() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={job.status} />
             <span className="text-xs text-ink-500 dark:text-slate-400">
-              名额 {job.accepted_count ?? 0}/{job.quota ?? 1} · {job.term || "未填学期"} · {job.job_type || "course_ta"}
+              {t("mo.quotaLine", {
+                accepted: job.accepted_count ?? 0,
+                quota: job.quota ?? 1,
+                term: job.term || t("common.termUnset"),
+                type: job.job_type || "course_ta",
+              })}
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={exportCsv} aria-label="导出申请人 CSV">
-              导出 CSV
+            <Button variant="secondary" onClick={exportCsv} aria-label={t("common.exportCsv")}>
+              {t("common.exportCsv")}
             </Button>
             {canClose ? (
               <Button variant="danger" onClick={closeJob}>
-                关闭岗位
+                {t("mo.closeJob")}
               </Button>
             ) : null}
             {canDeleteRecord ? (
-              <Button variant="outlineDanger" onClick={deleteJobRecord} aria-label="删除岗位记录">
-                删除记录
+              <Button variant="outlineDanger" onClick={deleteJobRecord} aria-label={t("mo.deleteRecord")}>
+                {t("mo.deleteRecord")}
               </Button>
             ) : null}
             {editing ? (
               <>
                 <Button variant="ghost" onClick={cancelEdit}>
-                  取消
+                  {t("common.cancel")}
                 </Button>
-                <Button onClick={save}>保存修改</Button>
+                <Button onClick={save}>{t("mo.saveChanges")}</Button>
               </>
             ) : (
               <Button variant="secondary" onClick={startEdit}>
-                编辑岗位
+                {t("mo.editJob")}
               </Button>
             )}
           </div>
@@ -548,16 +581,16 @@ export default function MOJobDetail() {
           <div className="flex flex-wrap items-end gap-2 mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
               <label htmlFor="transition-to" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-                推进流程
+                {t("mo.advanceFlow")}
               </label>
               <Select
                 id="transition-to"
                 className="mt-1 min-w-[160px]"
                 value={transitionTo}
                 onChange={(e) => setTransitionTo(e.target.value)}
-                aria-label="目标状态"
+                aria-label={t("mo.selectTarget")}
               >
-                <option value="">选择目标状态</option>
+                <option value="">{t("mo.selectTarget")}</option>
                 {nextStates.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -566,7 +599,7 @@ export default function MOJobDetail() {
               </Select>
             </div>
             <Button type="button" onClick={doTransition} disabled={!transitionTo}>
-              应用流转
+              {t("mo.applyTransition")}
             </Button>
           </div>
         ) : null}
@@ -576,24 +609,24 @@ export default function MOJobDetail() {
             <Input
               value={form.module_name}
               onChange={(e) => setForm({ ...form, module_name: e.target.value })}
-              aria-label="模块名称"
+              aria-label={t("mo.moduleName")}
             />
             <Textarea
               value={form.requirements}
               onChange={(e) => setForm({ ...form, requirements: e.target.value })}
-              aria-label="要求说明"
+              aria-label={t("mo.requirements")}
             />
             <div className="grid sm:grid-cols-2 gap-3">
               <Input
                 value={form.deadline}
                 onChange={(e) => setForm({ ...form, deadline: e.target.value })}
                 placeholder="YYYY-MM-DD"
-                aria-label="截止日期"
+                aria-label={t("common.deadline")}
               />
               <Input
                 value={form.skill_tags}
                 onChange={(e) => setForm({ ...form, skill_tags: e.target.value })}
-                aria-label="技能标签"
+                aria-label={t("mo.skillTags")}
               />
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -602,34 +635,34 @@ export default function MOJobDetail() {
                 min={1}
                 value={form.quota}
                 onChange={(e) => setForm({ ...form, quota: Math.max(1, Number(e.target.value) || 1) })}
-                aria-label="招聘人数"
+                aria-label={t("mo.headcount")}
               />
               <select
                 className="rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
                 value={form.job_type}
                 onChange={(e) => setForm({ ...form, job_type: e.target.value })}
-                aria-label="岗位类型"
+                aria-label={t("mo.jobType")}
               >
-                <option value="course_ta">课程 TA</option>
-                <option value="invigilation">监考</option>
-                <option value="event_support">活动支持</option>
+                <option value="course_ta">{t("mo.jobTypeCourseTa")}</option>
+                <option value="invigilation">{t("mo.jobTypeInvigilation")}</option>
+                <option value="event_support">{t("mo.jobTypeEvent")}</option>
               </select>
             </div>
             <Input
               value={form.term}
               onChange={(e) => setForm({ ...form, term: e.target.value })}
-              placeholder="学期"
-              aria-label="学期"
+              placeholder={t("mo.term")}
+              aria-label={t("mo.term")}
             />
             <Textarea
               value={form.schedule_text}
               onChange={(e) => setForm({ ...form, schedule_text: e.target.value })}
-              aria-label="工作时段"
+              aria-label={t("mo.scheduleText")}
               rows={2}
             />
             <div>
               <label htmlFor="job-assigned-hours" className="text-xs font-semibold text-ink-700 dark:text-slate-300">
-                每周工时（工时/周）
+                {t("mo.weeklyHours")}
               </label>
               <Input
                 id="job-assigned-hours"
@@ -639,7 +672,7 @@ export default function MOJobDetail() {
                 className="mt-1"
                 value={form.assigned_hours}
                 onChange={(e) => setForm({ ...form, assigned_hours: Number(e.target.value) })}
-                aria-label="每周工时（工时/周）"
+                aria-label={t("mo.weeklyHours")}
               />
             </div>
             <label className="flex items-center gap-2 text-sm text-ink-800 dark:text-slate-200">
@@ -648,108 +681,113 @@ export default function MOJobDetail() {
                 checked={form.allow_duplicate_apply_same_type}
                 onChange={(e) => setForm({ ...form, allow_duplicate_apply_same_type: e.target.checked })}
               />
-              允许同类型同学期重复申请
+              {t("common.allowDuplicateApply")}
             </label>
           </div>
         ) : (
           <>
             <p className="text-sm text-ink-600 dark:text-slate-300 whitespace-pre-wrap">{job.requirements}</p>
             <p className="text-xs text-ink-500 dark:text-slate-400 mt-3">
-              截止 {job.deadline} · 标签 {job.skill_tags} · 每周工时 {job.assigned_hours} 工时/周
+              {t("mo.deadlineDetail", {
+                date: job.deadline,
+                tags: job.skill_tags,
+                hours: job.assigned_hours,
+                unit: t("common.perWeekHours"),
+              })}
             </p>
             {job.schedule_text ? (
               <p className="text-xs text-ink-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">
-                时段：{job.schedule_text}
+                {t("common.schedule")}: {job.schedule_text}
               </p>
             ) : null}
           </>
         )}
       </Card>
 
-      <h2 className="font-display font-semibold text-lg text-ink-950 dark:text-white mb-3">申请人</h2>
+      <h2 className="font-display font-semibold text-lg text-ink-950 dark:text-white mb-3">{t("mo.applicants")}</h2>
       <Card className="p-4 mb-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
           <div className="flex flex-wrap gap-4 items-end">
             <div>
               <label htmlFor="app-sort" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block mb-1">
-                排序
+                {t("common.sort")}
               </label>
               <Select
                 id="app-sort"
                 className="min-w-[140px]"
                 value={appSort}
                 onChange={(e) => setAppSort(e.target.value)}
-                aria-label="申请人排序"
+                aria-label={t("common.sort")}
               >
-                <option value="">申请时间</option>
-                <option value="total_score">总分</option>
-                <option value="skill_match">技能匹配</option>
+                <option value="">{t("mo.sortAppliedAt")}</option>
+                <option value="total_score">{t("mo.totalScore")}</option>
+                <option value="skill_match">{t("mo.skillMatch")}</option>
               </Select>
             </div>
             <div>
               <label htmlFor="app-filter" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block mb-1">
-                申请状态
+                {t("common.status")}
               </label>
               <Select
                 id="app-filter"
                 className="min-w-[140px]"
                 value={appStatusFilter}
                 onChange={(e) => setAppStatusFilter(e.target.value)}
-                aria-label="按申请状态筛选"
+                aria-label={t("mo.filterByStatus")}
               >
-                <option value="">全部</option>
-                <option value="pending">已申请</option>
-                <option value="interviewing">面试中</option>
-                <option value="accepted">已录用</option>
-                <option value="rejected">已拒绝</option>
-                <option value="withdrawn">已撤回</option>
+                <option value="">{t("mo.allStatus")}</option>
+                <option value="pending">{t("mo.statPending")}</option>
+                <option value="interviewing">{t("mo.statInterviewing")}</option>
+                <option value="accepted">{t("mo.statAccepted")}</option>
+                <option value="rejected">{t("mo.statRejected")}</option>
+                <option value="withdrawn">{t("status.withdrawn")}</option>
               </Select>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outlineInfo" className="!py-2" onClick={handleAutoEvaluateAll} disabled={autoEvaluating}>
-              {autoEvaluating ? "评估中..." : "批量自动评估"}
+              {autoEvaluating ? t("common.evaluating") : t("mo.batchAutoEval")}
             </Button>
             <Button type="button" variant="secondary" className="!py-2" onClick={() => batchDecide("interviewing")}>
-              批量面试中
+              {t("mo.batchInterview")}
             </Button>
             <Button type="button" variant="outlineDanger" className="!py-2" onClick={() => batchDecide("rejected")}>
-              批量拒绝所选
+              {t("mo.batchRejectSelected")}
             </Button>
             <Button type="button" variant="outlineSuccess" className="!py-2" onClick={() => batchDecide("accepted")}>
-              批量录用所选
+              {t("mo.batchAcceptSelected")}
             </Button>
           </div>
         </div>
       </Card>
 
       {apps.length === 0 ? (
-        <Card className="p-8 text-center text-ink-500 dark:text-slate-400">暂无申请</Card>
+        <Card className="p-8 text-center text-ink-500 dark:text-slate-400">{t("mo.noApplicants")}</Card>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-soft">
-          <table className="w-full text-sm" aria-label="申请人列表">
+          <table className="w-full text-sm" aria-label={t("mo.applicantList")}>
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-ink-700 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
               <tr>
                 <th scope="col" className="px-2 py-3 w-10">
-                  <span className="sr-only">选择</span>
+                  <span className="sr-only">{t("common.select")}</span>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left">
-                  申请人
+                  {t("mo.applicantCol")}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left">
-                  岗位
+                  {t("mo.jobCol")}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left">
-                  邮箱
+                  {t("common.email")}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left">
-                  状态
+                  {t("common.status")}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left">
-                  总分
+                  {t("mo.scoreCol")}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left min-w-[220px]">
-                  操作
+                  {t("common.actions")}
                 </th>
               </tr>
             </thead>
@@ -767,23 +805,25 @@ export default function MOJobDetail() {
                           type="checkbox"
                           checked={selected.has(a.id)}
                           onChange={() => toggleSelect(a.id)}
-                          aria-label={`选择 ${a.ta_display_name ?? a.id}`}
+                          aria-label={t("mo.selectApplicant", { name: a.ta_display_name ?? String(a.id) })}
                         />
                       ) : (
-                        <span className="text-ink-300">—</span>
+                        <span className="text-ink-300">{t("common.dash")}</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-ink-950 dark:text-white">{a.ta_display_name ?? "—"}</div>
+                      <div className="font-semibold text-ink-950 dark:text-white">{a.ta_display_name ?? t("common.dash")}</div>
                       <div className="text-xs text-ink-500 dark:text-slate-400 mt-0.5">
-                        申请 #{a.id} · 用户 {a.ta_user_id}
+                        {t("mo.appIdLine", { id: a.id, userId: a.ta_user_id })}
                         {a.ta_student_id ? ` · ${a.ta_student_id}` : ""}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-ink-900 dark:text-slate-100">{job.module_name}</div>
                       <div className="text-xs text-ink-500 dark:text-slate-400 mt-0.5">
-                        {(a.job?.term || job.term || "—") + " · " + jobTypeLabel(a.job?.job_type ?? job.job_type)}
+                        {(a.job?.term || job.term || t("common.dash")) +
+                          " · " +
+                          jobTypeLabel(a.job?.job_type ?? job.job_type)}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-ink-600 dark:text-slate-300 text-sm">{a.ta_email}</td>
@@ -791,7 +831,7 @@ export default function MOJobDetail() {
                       <StatusBadge status={a.status} />
                     </td>
                     <td className="px-4 py-3 text-ink-700 dark:text-slate-200 tabular-nums">
-                      {a.evaluation_total != null ? a.evaluation_total : "—"}
+                      {a.evaluation_total != null ? a.evaluation_total : t("common.dash")}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1.5 flex-wrap items-center">
@@ -801,11 +841,11 @@ export default function MOJobDetail() {
                           className="!py-1.5 !px-2.5 text-xs"
                           onClick={() => downloadApplicantCv(a)}
                           disabled={!a.ta_cv_file_id}
-                          title={a.ta_cv_file_id ? "下载简历" : "无简历文件"}
-                          aria-label="查看简历"
+                          title={a.ta_cv_file_id ? t("mo.downloadResume") : t("mo.noResume")}
+                          aria-label={t("mo.resume")}
                         >
                           <IconEye />
-                          简历
+                          {t("mo.resume")}
                         </Button>
                         <Button
                           type="button"
@@ -813,7 +853,7 @@ export default function MOJobDetail() {
                           className="!py-1.5 !px-2.5 text-xs"
                           onClick={() => handleAutoEvaluate(a.id)}
                         >
-                          自动评分
+                          {t("mo.autoEval")}
                         </Button>
                         <Button
                           type="button"
@@ -821,7 +861,7 @@ export default function MOJobDetail() {
                           className="!py-1.5 !px-2.5 text-xs"
                           onClick={() => openEval(a)}
                         >
-                          {expandedEval === a.id ? "收起评分" : "评分"}
+                          {expandedEval === a.id ? t("mo.collapseEval") : t("mo.expandEval")}
                         </Button>
                         {a.status === "pending" ? (
                           <>
@@ -831,7 +871,7 @@ export default function MOJobDetail() {
                               className="!py-1.5 !px-2.5 text-xs"
                               onClick={() => decide(a.id, "interviewing")}
                             >
-                              面试中
+                              {t("mo.interviewingShort")}
                             </Button>
                             <Button
                               type="button"
@@ -840,7 +880,7 @@ export default function MOJobDetail() {
                               onClick={() => decide(a.id, "rejected")}
                             >
                               <IconX />
-                              拒绝
+                              {t("mo.reject")}
                             </Button>
                           </>
                         ) : a.status === "interviewing" ? (
@@ -852,7 +892,7 @@ export default function MOJobDetail() {
                               onClick={() => decide(a.id, "accepted")}
                             >
                               <IconCheck />
-                              录用
+                              {t("mo.accept")}
                             </Button>
                             <Button
                               type="button"
@@ -861,7 +901,7 @@ export default function MOJobDetail() {
                               onClick={() => decide(a.id, "rejected")}
                             >
                               <IconX />
-                              拒绝
+                              {t("mo.reject")}
                             </Button>
                           </>
                         ) : null}
@@ -874,11 +914,11 @@ export default function MOJobDetail() {
                         <div className="grid sm:grid-cols-5 gap-2 max-w-4xl">
                           {(
                             [
-                              ["skill_match", "技能"],
-                              ["course_experience", "课程经验"],
-                              ["academic_background", "学业"],
-                              ["availability_score", "可用性"],
-                              ["communication", "沟通"],
+                              ["skill_match", t("mo.evalSkill")],
+                              ["course_experience", t("mo.evalCourse")],
+                              ["academic_background", t("mo.evalAcademic")],
+                              ["availability_score", t("mo.evalAvailability")],
+                              ["communication", t("mo.evalCommunication")],
                             ] as const
                           ).map(([k, lab]) => (
                             <div key={k}>
@@ -901,7 +941,7 @@ export default function MOJobDetail() {
                         </div>
                         <div className="grid sm:grid-cols-2 gap-3 mt-3 max-w-4xl">
                           <div>
-                            <label className="text-xs font-semibold text-ink-600 dark:text-slate-400">标签</label>
+                            <label className="text-xs font-semibold text-ink-600 dark:text-slate-400">{t("mo.evalTags")}</label>
                             <Input
                               className="mt-1"
                               value={evalDraft.label}
@@ -910,7 +950,7 @@ export default function MOJobDetail() {
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-ink-600 dark:text-slate-400">决策备注</label>
+                            <label className="text-xs font-semibold text-ink-600 dark:text-slate-400">{t("mo.evalNotes")}</label>
                             <Input
                               className="mt-1"
                               value={evalDraft.decision_note}
@@ -919,7 +959,7 @@ export default function MOJobDetail() {
                           </div>
                         </div>
                         <div className="mt-3 max-w-4xl">
-                          <label className="text-xs font-semibold text-ink-600 dark:text-slate-400">总评</label>
+                          <label className="text-xs font-semibold text-ink-600 dark:text-slate-400">{t("mo.evalSummary")}</label>
                           <Textarea
                             className="mt-1 min-h-[5.5rem]"
                             value={evalDraft.total_note}
@@ -928,7 +968,7 @@ export default function MOJobDetail() {
                           />
                         </div>
                         <Button type="button" className="mt-3" onClick={() => saveEval(a.id)}>
-                          保存评分
+                          {t("mo.saveEval")}
                         </Button>
                       </td>
                     </tr>

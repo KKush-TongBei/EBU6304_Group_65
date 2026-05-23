@@ -12,6 +12,9 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * JSON API Servlet 基类：统一序列化响应、将 {@link com.ebu6304.tarecruit.api.ApiException} 映射为 HTTP 状态与 JSON body。
+ */
 public abstract class JsonServlet extends HttpServlet {
   protected static final ObjectMapper M = AppJson.mapper();
   public static final String ATTR_USER_ID = "taUserId";
@@ -41,11 +44,13 @@ public abstract class JsonServlet extends HttpServlet {
       return;
     }
     for (Throwable c = t; c != null; c = c.getCause()) {
-      if (c instanceof IOException) {
+      if (c instanceof IOException io) {
+        getServletContext().log("Data store IO failure: " + io.getMessage(), io);
         writeJson(resp, 503, Map.of("detail", "Data store temporarily unavailable. Please retry later."));
         return;
       }
     }
+    getServletContext().log("Unhandled API error", t);
     writeJson(resp, 500, Map.of("detail", "Internal server error"));
   }
 

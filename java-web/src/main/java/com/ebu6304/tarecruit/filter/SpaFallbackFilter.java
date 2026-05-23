@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
+/** 单页应用回退：非 API、非静态资源路径转发到 {@code index.html}，支持前端路由。 */
 public final class SpaFallbackFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)

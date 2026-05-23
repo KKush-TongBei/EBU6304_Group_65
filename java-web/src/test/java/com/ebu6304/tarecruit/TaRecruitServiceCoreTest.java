@@ -950,4 +950,125 @@ class TaRecruitServiceCoreTest {
     ApiException ex = assertThrows(ApiException.class, () -> svc.register(body));
     assertEquals(422, ex.status);
   }
+
+  @Test
+  void adminListUsersFiltersByRoleAndQuery() {
+    Map<String, Object> listed = svc.adminListUsers(1, "ta", "ta@test", 0, 50);
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> items = (List<Map<String, Object>>) listed.get("items");
+    assertEquals(1, listed.get("total"));
+    assertEquals(1, items.size());
+    assertEquals("ta@test.edu", items.get(0).get("email"));
+  }
+
+  @Test
+  void adminDisableBlocksLoginAndApiAccess() {
+    svc.adminPatchUser(1, 3, Map.of("disabled", true));
+    Map<String, Object> loginBody = new LinkedHashMap<>();
+    loginBody.put("email", "ta@test.edu");
+    loginBody.put("password", "Ta123456");
+    ApiException loginEx = assertThrows(ApiException.class, () -> svc.login(loginBody));
+    assertEquals(403, loginEx.status);
+    ApiException meEx = assertThrows(ApiException.class, () -> svc.me(3));
+    assertEquals(403, meEx.status);
+  }
+
+  @Test
+  void adminEnableRestoresLogin() {
+    svc.adminPatchUser(1, 3, Map.of("disabled", true));
+    svc.adminPatchUser(1, 3, Map.of("disabled", false));
+    Map<String, Object> loginBody = new LinkedHashMap<>();
+    loginBody.put("email", "ta@test.edu");
+    loginBody.put("password", "Ta123456");
+    assertDoesNotThrow(() -> svc.login(loginBody));
+  }
+
+  @Test
+  void adminResetPasswordAllowsLoginWithNewPassword() {
+    svc.adminPatchUser(1, 3, Map.of("password", "Newpass99"));
+    Map<String, Object> loginBody = new LinkedHashMap<>();
+    loginBody.put("email", "ta@test.edu");
+    loginBody.put("password", "Newpass99");
+    assertDoesNotThrow(() -> svc.login(loginBody));
+  }
+
+  @Test
+  void adminDeleteTaCascadesApplications() throws Exception {
+    List<ApplicationRecord> apps = new ArrayList<>();
+    ApplicationRecord a = new ApplicationRecord();
+    a.id = 1;
+    a.job_id = 1;
+    a.ta_user_id = 3;
+    a.status = "pending";
+    a.created_at = Instant.now();
+    apps.add(a);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("applications.json"), apps);
+
+    svc.adminDeleteUser(1, 3);
+
+    List<UserRecord> users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    assertTrue(users.stream().noneMatch(u -> u.id == 3));
+
+    List<ApplicationRecord> afterApps = AtomicJsonFile.readList(
+        dataDir.resolve("applications.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<ApplicationRecord>>() {},
+        new ArrayList<>());
+    assertTrue(afterApps.isEmpty());
+  }
+
+  @Test
+  void adminDeleteMoWithOpenJobCascades() throws Exception {
+    List<JobRecord> jobs = new ArrayList<>();
+    JobRecord j = new JobRecord();
+    j.id = 1;
+    j.module_name = "OpenJob";
+    j.status = "open";
+    j.created_by = 2;
+    j.quota = 1;
+    j.created_at = Instant.now();
+    j.updated_at = Instant.now();
+    jobs.add(j);
+    AtomicJsonFile.writeAtomic(dataDir.resolve("jobs.json"), jobs);
+    Counters c = AtomicJsonFile.readObject(dataDir.resolve("counters.json"), Counters.class, new Counters());
+    c.jobSeq = 2;
+    AtomicJsonFile.writeAtomic(dataDir.resolve("counters.json"), c);
+
+    svc.adminDeleteUser(1, 2);
+
+    List<UserRecord> users = AtomicJsonFile.readList(
+        dataDir.resolve("users.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<UserRecord>>() {},
+        new ArrayList<>());
+    assertTrue(users.stream().noneMatch(u -> u.id == 2));
+
+    List<JobRecord> afterJobs = AtomicJsonFile.readList(
+        dataDir.resolve("jobs.json"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<JobRecord>>() {},
+        new ArrayList<>());
+    assertTrue(afterJobs.isEmpty());
+  }
+
+  @Test
+  void adminCannotDeleteAdminOrSelf() {
+    ApiException selfEx = assertThrows(ApiException.class, () -> svc.adminDeleteUser(1, 1));
+    assertEquals(403, selfEx.status);
+    Map<String, Object> created = svc.adminCreateUser(1, Map.of(
+        "email", "other-admin@test.edu",
+        "password", "Admin9999",
+        "role", "admin",
+        "display_name", "Other"));
+    int otherAdminId = ((Number) created.get("id")).intValue();
+    ApiException adminEx = assertThrows(ApiException.class, () -> svc.adminDeleteUser(1, otherAdminId));
+    assertEquals(403, adminEx.status);
+  }
+
+  @Test
+  void adminCannotDisableAdmin() {
+    ApiException ex = assertThrows(
+        ApiException.class, () -> svc.adminPatchUser(1, 1, Map.of("disabled", true)));
+    assertEquals(403, ex.status);
+  }
 }

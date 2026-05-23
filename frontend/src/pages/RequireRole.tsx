@@ -1,5 +1,7 @@
+/** 路由守卫：未登录跳转登录页，角色不匹配则重定向到对应首页。 */
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
+import { useLocale } from "../locale";
 import type { UserRole } from "../types";
 import { Spinner } from "../ui";
 
@@ -11,16 +13,17 @@ export default function RequireRole({
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
+  const { t } = useLocale();
   if (loading) {
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 dark:bg-slate-950 text-ink-500 dark:text-slate-400"
         role="status"
         aria-live="polite"
-        aria-label="正在加载"
+        aria-label={t("common.loadingSession")}
       >
         <Spinner />
-        <span className="text-sm">加载中…</span>
+        <span className="text-sm">{t("common.loading")}</span>
       </div>
     );
   }

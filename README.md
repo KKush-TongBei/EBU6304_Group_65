@@ -79,7 +79,7 @@ mvn package
 
 生产环境请设置 **`TA_JWT_SECRET`**（或 `SECRET_KEY`）为足够长的随机串；亦可于 `java-web/src/main/webapp/WEB-INF/web.xml` 的 `secretKey` 上下文参数中配置（留空则使用内置默认值，仅适合本地）。变量名示例见根目录 [`.env.example`](.env.example)。
 
-**组内多台电脑同步用户与业务数据：** `java-web/data/`（含 **`*.json`**、**`uploads/`**、**`cv_payloads/`** 等）已配置为可由 Git 跟踪。新建用户、上传简历或改数据后请 **`git add java-web/data` + `commit` + `push`**，其他成员 **`git pull`** 后即可一致。删除用户记录目前需**手动编辑 `users.json`** 或后续扩展「管理员删除 / 用户注销」接口；**换电脑本身不会清空数据**，只要仓库里已有提交。若仓库为**公开**或交作业打包，请自行脱敏或排除敏感文件。
+**组内多台电脑同步用户与业务数据：** `java-web/data/`（含 **`*.json`**、**`uploads/`**、**`cv_payloads/`** 等）已配置为可由 Git 跟踪。新建用户、上传简历或改数据后请 **`git add java-web/data` + `commit` + `push`**，其他成员 **`git pull`** 后即可一致。**换电脑本身不会清空数据**，只要仓库里已有提交。若仓库为**公开**或交作业打包，请自行脱敏或排除敏感文件。
 
 ### 3. 前端嵌入 WAR（同源 `/api`）
 
@@ -127,7 +127,13 @@ npm run dev
 - **数据文件**：`data/users.json`（可通过 `TA_DATA_DIR` / `-Dta.data.dir` 指向具体目录）；角色支持 `ta`、`mo`、`admin`。
 - **DAO 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserDAO.java`，负责 `users.json` 的读取/写入，默认单例 `getInstance()`，并用读写锁保护并发访问。
 - **Service 层**：`java-web/src/main/java/com/ebu6304/tarecruit/user/UserService.java`，提供 `register` / `login` 业务逻辑，以及供主流程调用的 `persistNewTa`（指定用户 id，与 `counters.json` 对齐）、`passwordMatches`（登录验密）。
-- **与现有接口衔接**：`AuthServlet` 仍暴露 `/api/auth/register`、`/api/auth/login`；公开 **TA/MO 注册** 时由 `TaRecruitService` 调用 `UserService` 写入 `users.json`；**管理员创建 MO/Admin**（`/api/admin/users`）同样经 `UserService.persistNewStaff` 写入同一 `users.json`。**管理员创建 MO** 须填职工号（`student_id`），活动日志动作与公开 MO 注册同为 **`register`**，详情 JSON 中含 `created_by_admin_id` 便于区分代建；创建 Admin 仍为 **`user_created_by_admin`**。**环境变量种子管理员**（`ensureSeedAdmin`）同上。**登录验密** 走 `UserService.passwordMatches`（BCrypt）。JWT 签发、活动日志与计数器仍由 `TaRecruitService` 统一处理。
+- **与现有接口衔接**：`AuthServlet` 仍暴露 `/api/auth/register`、`/api/auth/login`；公开 **TA/MO 注册** 时由 `TaRecruitService` 调用 `UserService` 写入 `users.json`；**管理员创建 MO/Admin**（`POST /api/admin/users`）同样经 `UserService.persistNewStaff` 写入同一 `users.json`。**管理员创建 MO** 须填职工号（`student_id`），活动日志动作与公开 MO 注册同为 **`register`**，详情 JSON 中含 `created_by_admin_id` 便于区分代建；创建 Admin 仍为 **`user_created_by_admin`**。**环境变量种子管理员**（`ensureSeedAdmin`）同上。**登录验密** 走 `UserService.passwordMatches`（BCrypt）。JWT 签发、活动日志与计数器仍由 `TaRecruitService` 统一处理。
+- **管理员用户治理（前端「用户管理」）**：
+  - `GET /api/admin/users`：列表与搜索（`role`、`q`、`skip`、`limit`），返回 `{ items, total }`。
+  - `PATCH /api/admin/users/{id}`：禁用/启用（`disabled`，仅 TA/MO）或重置密码（`password`）。
+  - `DELETE /api/admin/users/{id}`：删除 TA/MO 并级联清理申请、简历、通知等；**删除 MO 时强制删除其全部岗位**（不要求先关岗）。**不可删除管理员账号**或当前登录管理员自身。
+  - 用户记录含 `disabled` 字段；禁用后登录与已签发 JWT 的业务请求均返回 403。
+  - TA/MO 仍可通过 `POST /api/auth/delete-account` 自助注销（MO 须先处理完自有岗位）。
 - **密码安全**：注册时使用 BCrypt 哈希加盐（`Passwords.hash`），登录时使用 BCrypt 校验（经 `UserService`/`Passwords.verify`），不存明文密码。
 - **测试**：`java-web/src/test/java/com/ebu6304/tarecruit/user/UserServiceTest.java`，覆盖注册加密、登录校验、重复邮箱、JSON 损坏错误处理。
 
@@ -138,7 +144,7 @@ npm run dev
 - 列表加载指示与骨架、表格斑马纹与表头可访问性（`scope`）  
 - **TA**：通知支持「仅未读」「最近 7 天」、单条/全部标已读；Dashboard 展示规则型提示（截止临近、资料待补）；Token 过期自动跳转登录并提示  
 - **MO**：**岗位模板**（内置 + 可保存个人模板）、招聘管道概览与状态流转；**申请状态机**（已申请 → 面试中 → 已录用/已拒绝，且拒绝后不可再录用）；编辑岗位未保存时离开页面会拦截路由；导出 CSV、状态操作有成功/失败提示  
-- **Admin**：总览页标题为「管理员 · 总览」；工作量表按 TA **有效申请**汇总岗位预估工时，可设超负荷阈值，**超过 20h/周** 时红色预警；表格可单独刷新；活动日志支持 **实体类型** 筛选与风险行高亮；系统设置含默认岗位名额与学期标签  
+- **Admin**：总览页标题为「管理员 · 总览」；**用户管理**页支持列表/搜索、禁用启用、重置密码、删除 TA/MO；工作量表按 TA **有效申请**汇总岗位预估工时，可设超负荷阈值，**超过 20h/周** 时红色预警；表格可单独刷新；活动日志支持 **实体类型** 筛选与风险行高亮；系统设置含默认岗位名额与学期标签  
 - **全角色**：导航栏 **通知** 入口与未读角标（依赖 `/api/notifications`）  
 
 ## 功能概览（非 AI）

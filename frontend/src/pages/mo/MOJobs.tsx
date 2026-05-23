@@ -1,11 +1,14 @@
+/** MO 岗位列表：查看自己发布的招聘。 */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";
+import { useLocale } from "../../locale";
 import type { Job, JobStatus } from "../../types";
 import AppShell from "../../AppShell";
 import { Card, Select, StatusBadge } from "../../ui";
 
 export default function MOJobs() {
+  const { t } = useLocale();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filter, setFilter] = useState<string>("");
 
@@ -18,34 +21,34 @@ export default function MOJobs() {
   }, [filter]);
 
   return (
-    <AppShell title="我的岗位" role="mo">
+    <AppShell title={t("shell.titleMoJobs")} role="mo">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <label htmlFor="job-filter" className="text-xs font-semibold text-ink-700 dark:text-slate-300">
-          按状态筛选
+          {t("mo.filterByJobStatus")}
         </label>
         <Select
           id="job-filter"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           className="w-48"
-          aria-label="岗位状态筛选"
+          aria-label={t("mo.jobStatusFilterAria")}
         >
-          <option value="">全部</option>
-          <option value="draft">草稿</option>
-          <option value="open">开放</option>
-          <option value="screening">筛选中</option>
-          <option value="interview">候选中</option>
-          <option value="shortlist">短名单</option>
-          <option value="filled">已招满</option>
-          <option value="closed">已关闭</option>
-          <option value="cancelled">已取消</option>
+          <option value="">{t("roles.all")}</option>
+          <option value="draft">{t("status.draft")}</option>
+          <option value="open">{t("status.open")}</option>
+          <option value="screening">{t("status.screening")}</option>
+          <option value="interview">{t("status.interview")}</option>
+          <option value="shortlist">{t("status.shortlist")}</option>
+          <option value="filled">{t("status.filled")}</option>
+          <option value="closed">{t("status.closed")}</option>
+          <option value="cancelled">{t("status.cancelled")}</option>
         </Select>
       </div>
       {jobs.length === 0 ? (
         <Card className="p-12 text-center text-ink-500">
-          暂无岗位。{" "}
+          {t("mo.noJobsGoPost")}{" "}
           <Link className="text-accent font-semibold" to="/mo/post">
-            去发布
+            {t("mo.goPost")}
           </Link>
         </Card>
       ) : (
@@ -60,15 +63,16 @@ export default function MOJobs() {
                       {(j.pending_applications_count ?? 0) > 0 ? (
                         <span
                           className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold shadow-sm tabular-nums"
-                          title="待处理申请（未推进流程）"
-                          aria-label={`${j.pending_applications_count} 条待处理申请`}
+                          title={t("mo.pendingAppsTitle")}
+                          aria-label={t("mo.pendingAppsAria", { count: j.pending_applications_count ?? 0 })}
                         >
                           {j.pending_applications_count}
                         </span>
                       ) : null}
                     </div>
                     <p className="text-xs text-ink-500 dark:text-slate-400 mt-1">
-                      截止 {j.deadline || "—"} · {j.assigned_hours} 工时/周 · 名额 {j.accepted_count ?? 0}/{j.quota ?? 1}
+                      {t("common.deadline")} {j.deadline || t("common.dash")} · {j.assigned_hours}{" "}
+                      {t("common.perWeekHours")} · {t("common.quota")} {j.accepted_count ?? 0}/{j.quota ?? 1}
                     </p>
                   </div>
                   <div className="shrink-0 self-center">

@@ -1,3 +1,4 @@
+/** 全局 Toast/反馈提示：各页面通过 Context 弹出成功或错误消息。 */
 import {
   createContext,
   useCallback,
@@ -6,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useLocale } from "./locale";
 import { Button } from "./ui";
 
 export type ToastVariant = "success" | "error" | "info";
@@ -28,6 +30,7 @@ type FeedbackCtx = {
 const Ctx = createContext<FeedbackCtx | null>(null);
 
 export function FeedbackProvider({ children }: { children: ReactNode }) {
+  const { t } = useLocale();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(0);
   const confirmResolver = useRef<((v: boolean) => void) | null>(null);
@@ -95,13 +98,13 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="secondary" onClick={() => resolveConfirm(false)} autoFocus>
-                {confirmState.cancelText ?? "取消"}
+                {confirmState.cancelText ?? t("common.cancel")}
               </Button>
               <Button
                 variant={confirmState.danger ? "danger" : "primary"}
                 onClick={() => resolveConfirm(true)}
               >
-                {confirmState.confirmText ?? "确定"}
+                {confirmState.confirmText ?? t("common.confirm")}
               </Button>
             </div>
           </div>

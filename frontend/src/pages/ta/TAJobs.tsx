@@ -1,7 +1,9 @@
+/** TA 岗位浏览：筛选、收藏、投递申请。 */
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import { useAuth } from "../../AuthContext";
 import { useFeedback } from "../../feedback";
+import { useLocale } from "../../locale";
 import type { Application, ApplicationStatus, Job, JobStatus } from "../../types";
 import AppShell from "../../AppShell";
 import { Button, Card, Input, ListSkeleton, Select, StatusBadge } from "../../ui";
@@ -37,17 +39,20 @@ function projectedWeeklyHoursAfterApply(apps: Application[], job: Job): number {
   return base + job.assigned_hours;
 }
 
-function applicationSummary(status: ApplicationStatus | undefined): string {
-  if (!status) return "尚未申请";
+function applicationSummary(
+  status: ApplicationStatus | undefined,
+  t: (key: string) => string
+): string {
+  if (!status) return t("ta.appSummaryNotApplied");
   switch (status) {
     case "pending":
-      return "您已申请，当前待处理";
+      return t("ta.appSummaryPending");
     case "accepted":
-      return "您已被录用";
+      return t("ta.appSummaryAccepted");
     case "rejected":
-      return "本次申请未通过";
+      return t("ta.appSummaryRejected");
     case "withdrawn":
-      return "您已撤回，可再次申请";
+      return t("ta.appSummaryWithdrawn");
     default:
       return "";
   }
@@ -56,6 +61,7 @@ function applicationSummary(status: ApplicationStatus | undefined): string {
 export default function TAJobs() {
   const { toast } = useFeedback();
   const { user } = useAuth();
+  const { t, te } = useLocale();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [apps, setApps] = useState<Application[]>([]);
   const [q, setQ] = useState("");
@@ -85,13 +91,12 @@ export default function TAJobs() {
         setApps(a);
         setErr("");
       })
-      .catch((e) => setErr(e instanceof Error ? e.message : "加载失败"))
+      .catch((e) => setErr(e instanceof Error ? te(e.message) : t("common.loadFailed")))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     load();
-    // 与「搜索」一致：切换开放/已关闭时按当前筛选重新拉取；不在此依赖 q/skill 以免输入即请求
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [listScope]);
 
@@ -102,10 +107,10 @@ export default function TAJobs() {
       await api.jobs.apply(jobId);
       const a = await api.ta.myApplications();
       setApps(a);
-      toast("申请已提交", "success");
+      toast(t("ta.applySubmitted"), "success");
       load();
     } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : "申请失败", "error");
+      toast(e instanceof Error ? te(e.message) : t("ta.applyFailed"), "error");
     }
   };
 
@@ -115,7 +120,7 @@ export default function TAJobs() {
       await api.ta.toggleFavorite(jobId);
       load();
     } catch (err2: unknown) {
-      toast(err2 instanceof Error ? err2.message : "操作失败", "error");
+      toast(err2 instanceof Error ? te(err2.message) : t("common.opFailed"), "error");
     }
   };
 
@@ -133,8 +138,8 @@ export default function TAJobs() {
   };
 
   return (
-    <AppShell title="浏览岗位" role="ta">
-      <div className="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="岗位列表范围">
+    <AppShell title={t("ta.jobsTitle")} role="ta">
+      <div className="flex flex-wrap gap-2 mb-4" role="tablist" aria-label={t("ta.jobListScopeAria")}>
         <Button
           type="button"
           variant={listScope === "open" ? "primary" : "outlineMuted"}
@@ -143,7 +148,7 @@ export default function TAJobs() {
           role="tab"
           onClick={() => setListScope("open")}
         >
-          开放岗位
+          {t("ta.jobsOpen")}
         </Button>
         <Button
           type="button"
@@ -153,7 +158,7 @@ export default function TAJobs() {
           role="tab"
           onClick={() => setListScope("closed")}
         >
-          已关闭
+          {t("ta.jobsClosed")}
         </Button>
       </div>
       <Card className="p-4 mb-6">
@@ -161,46 +166,51 @@ export default function TAJobs() {
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[140px]">
               <label htmlFor="job-q" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-                关键词
+                {t("common.keyword")}
               </label>
               <Input
                 id="job-q"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="模块名或要求"
+                placeholder={t("ta.moduleOrReq")}
               />
             </div>
             <div className="flex-1 min-w-[140px]">
               <label htmlFor="job-skill" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-                技能
+                {t("ta.skillFilter")}
               </label>
-              <Input id="job-skill" value={skill} onChange={(e) => setSkill(e.target.value)} placeholder="如 Python" />
+              <Input
+                id="job-skill"
+                value={skill}
+                onChange={(e) => setSkill(e.target.value)}
+                placeholder={t("ta.skillPlaceholder")}
+              />
             </div>
             <div className="min-w-[140px]">
               <label htmlFor="job-sort" className="text-xs font-semibold text-ink-700 dark:text-slate-300 block">
-                排序
+                {t("common.sort")}
               </label>
               <Select id="job-sort" className="mt-1 w-full" value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="">默认（最新发布）</option>
-                <option value="deadline">截止日</option>
-                <option value="created_at">发布时间</option>
-                <option value="assigned_hours">预估每周工时（低→高）</option>
-                <option value="quota">招聘名额（少→多）</option>
+                <option value="">{t("ta.sortDefault")}</option>
+                <option value="deadline">{t("ta.sortDeadline")}</option>
+                <option value="created_at">{t("ta.sortCreatedAt")}</option>
+                <option value="assigned_hours">{t("ta.sortAssignedHours")}</option>
+                <option value="quota">{t("ta.sortQuota")}</option>
               </Select>
             </div>
-            <Button type="submit">搜索</Button>
+            <Button type="submit">{t("common.search")}</Button>
             <Button type="button" variant="ghost" onClick={clearFilters}>
-              清空条件
+              {t("ta.clearFilters")}
             </Button>
           </div>
           <div className="flex flex-wrap gap-4 text-sm text-ink-800 dark:text-slate-200">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={favoritesOnly} onChange={(e) => setFavoritesOnly(e.target.checked)} />
-              仅收藏
+              {t("ta.favoritesOnly")}
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={unappliedOnly} onChange={(e) => setUnappliedOnly(e.target.checked)} />
-              仅未申请
+              {t("ta.unappliedOnly")}
             </label>
           </div>
         </form>
@@ -215,7 +225,7 @@ export default function TAJobs() {
         <ListSkeleton rows={5} />
       ) : jobs.length === 0 ? (
         <Card className="p-12 text-center text-ink-500 dark:text-slate-400">
-          {listScope === "open" ? "未找到符合条件的开放岗位。" : "暂无已关闭岗位（含截止停招、满员、教师关闭等）。"}
+          {listScope === "open" ? t("ta.noOpenJobs") : t("ta.noClosedJobs")}
         </Card>
       ) : (
         <div className="space-y-4">
@@ -240,28 +250,42 @@ export default function TAJobs() {
                         variant="ghost"
                         className="!py-0 !px-2 text-lg"
                         onClick={(e) => toggleFav(e, j.id)}
-                        aria-label={j.favorited ? "取消收藏" : "收藏岗位"}
-                        title={j.favorited ? "取消收藏" : "收藏"}
+                        aria-label={j.favorited ? t("ta.unfavoriteJob") : t("ta.favoriteJob")}
+                        title={j.favorited ? t("ta.unfavorite") : t("ta.favorite")}
                       >
                         {j.favorited ? "★" : "☆"}
                       </Button>
                     </div>
                     <p className="text-xs text-ink-500 dark:text-slate-400 mt-1">
-                      截止 {j.deadline || "—"} · 预估每周工时 {j.assigned_hours} 工时/周 · 名额 {j.accepted_count ?? 0}/{j.quota ?? 1} ·{" "}
-                      <StatusBadge status={j.status as JobStatus} />
+                      {t("ta.deadlineLine", {
+                        date: j.deadline || t("common.dash"),
+                        hours: j.assigned_hours,
+                        unit: t("common.perWeekHours"),
+                        accepted: j.accepted_count ?? 0,
+                        quota: j.quota ?? 1,
+                      })}{" "}
+                      · <StatusBadge status={j.status as JobStatus} />
                     </p>
                     {j.term ? (
-                      <p className="text-xs text-ink-500 dark:text-slate-400 mt-0.5">学期 {j.term}</p>
+                      <p className="text-xs text-ink-500 dark:text-slate-400 mt-0.5">
+                        {t("ta.termLine", { term: j.term })}
+                      </p>
                     ) : null}
-                    <p className="text-sm text-ink-600 dark:text-slate-300 mt-2">{applicationSummary(existing?.status)}</p>
+                    <p className="text-sm text-ink-600 dark:text-slate-300 mt-2">
+                      {applicationSummary(existing?.status, t)}
+                    </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 max-w-[11rem] text-right">
                     {wouldExceedSelfCap ? (
                       <span
                         className="text-xs font-semibold text-red-800 dark:text-red-100 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 px-2 py-1 rounded-lg"
-                        title={`当前已计每周约 ${weeklyHoursFromActiveApps(apps).toFixed(1)} 工时/周，若计入本岗位约 ${projected.toFixed(1)} 工时/周，超过您在资料中设置的 ${maxWeekly} 工时/周`}
+                        title={t("ta.overloadTooltip", {
+                          current: weeklyHoursFromActiveApps(apps).toFixed(1),
+                          projected: projected.toFixed(1),
+                          max: maxWeekly,
+                        })}
                       >
-                        录用将超负荷
+                        {t("ta.wouldOverload")}
                       </span>
                     ) : null}
                     {existing && <StatusBadge status={existing.status} />}
@@ -269,18 +293,20 @@ export default function TAJobs() {
                 </div>
                 <p className="text-sm text-ink-700 dark:text-slate-200 mt-3 whitespace-pre-wrap">{j.requirements}</p>
                 {j.skill_tags && (
-                  <p className="text-xs text-ink-500 dark:text-slate-400 mt-2">技能标签：{j.skill_tags}</p>
+                  <p className="text-xs text-ink-500 dark:text-slate-400 mt-2">
+                    {t("ta.skillTagsLine", { tags: j.skill_tags })}
+                  </p>
                 )}
                 {j.schedule_text ? (
-                  <p className="text-xs text-ink-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">时段：{j.schedule_text}</p>
+                  <p className="text-xs text-ink-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">
+                    {t("common.schedule")}: {j.schedule_text}
+                  </p>
                 ) : null}
                 <div className="mt-4">
                   {canApply ? (
-                    <Button onClick={() => apply(j.id)}>申请</Button>
+                    <Button onClick={() => apply(j.id)}>{t("ta.apply")}</Button>
                   ) : existing?.status === "pending" ? (
-                    <span className="text-sm text-ink-500 dark:text-slate-400">
-                      请在「我的申请」中撤回（若需）
-                    </span>
+                    <span className="text-sm text-ink-500 dark:text-slate-400">{t("ta.withdrawInApplications")}</span>
                   ) : null}
                 </div>
               </Card>
