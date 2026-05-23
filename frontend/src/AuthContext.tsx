@@ -1,3 +1,6 @@
+/**
+ * 全局认证状态：登录/注册后保存 Token，启动时调用 {@code /api/auth/me} 恢复当前用户。
+ */
 import {
   createContext,
   useCallback,

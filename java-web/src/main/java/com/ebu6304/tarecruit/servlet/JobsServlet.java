@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** 岗位列表与详情 API（按角色过滤可见范围）。 */
 @WebServlet(urlPatterns = {"/api/jobs", "/api/jobs/*"})
 public final class JobsServlet extends JsonServlet {
   private static final Pattern APPLY = Pattern.compile("^/(\\d+)/apply$");

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
+/** 健康检查：供部署与监控确认服务存活。 */
 @WebServlet("/api/health")
 public final class HealthServlet extends JsonServlet {
   @Override

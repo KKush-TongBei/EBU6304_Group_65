@@ -1,3 +1,7 @@
+/**
+ * 后端 REST 客户端：在 localStorage 读写 JWT（{@code ta_recruit_token}），请求头附带 Bearer；
+ * API 错误保留原始 {@code detail}，展示时由 {@link translateApiMessage}（{@code te()}）按界面语言翻译。
+ */
 import { withAppBase } from "./appBase";
 import type {
   ActivityLog,
@@ -5,6 +9,7 @@ import type {
   AppSettings,
   Job,
   Notification,
+  AdminUserSummary,
   User,
   UserRole,
   WorkloadRow,
@@ -239,6 +244,21 @@ export const api = {
       display_name?: string;
       student_id?: string;
     }) => request<User>("/api/admin/users", { method: "POST", json: body }),
+    listUsers: (params?: { role?: string; q?: string; skip?: number; limit?: number }) => {
+      const sp = new URLSearchParams();
+      if (params?.role) sp.set("role", params.role);
+      if (params?.q) sp.set("q", params.q);
+      if (params?.skip != null) sp.set("skip", String(params.skip));
+      if (params?.limit != null) sp.set("limit", String(params.limit));
+      const q = sp.toString();
+      return request<{ items: AdminUserSummary[]; total: number }>(
+        `/api/admin/users${q ? `?${q}` : ""}`
+      );
+    },
+    patchUser: (id: number, body: { disabled?: boolean; password?: string }) =>
+      request<AdminUserSummary>(`/api/admin/users/${id}`, { method: "PATCH", json: body }),
+    deleteUser: (id: number) =>
+      request<{ ok: boolean }>(`/api/admin/users/${id}`, { method: "DELETE" }),
     workload: (maxHours?: number) => {
       const q = maxHours != null ? `?max_hours=${maxHours}` : "";
       return request<WorkloadRow[]>(`/api/admin/workload${q}`);

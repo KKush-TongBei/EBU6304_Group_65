@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** 站内通知：列表、未读数、标记已读等。 */
 @WebServlet(urlPatterns = {"/api/notifications", "/api/notifications/*"})
 public final class NotificationsServlet extends JsonServlet {
   private static final Pattern NOTIF_ID = Pattern.compile("^/(\\d+)$");

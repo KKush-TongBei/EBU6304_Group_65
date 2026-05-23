@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/** 用户实体：对应 {@code users.json} 中单条记录（含 password_hash、角色、登录失败计数等）。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class UserRecord {
   public int id;
@@ -21,6 +22,8 @@ public final class UserRecord {
   public Instant locked_until;
   /** Incremented each time an account is locked after repeated failed logins; drives escalating lock duration. */
   public int lockout_count = 0;
+  /** When true, login and authenticated API access are rejected until re-enabled by an administrator. */
+  public boolean disabled = false;
   /** Structured profile (TA) */
   public List<String> profile_skills = new ArrayList<>();
   public String preferred_courses = "";

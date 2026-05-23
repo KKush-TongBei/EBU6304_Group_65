@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+/** 已登录用户的布局壳：顶栏导航、未读通知、深浅色与语言切换、退出登录。 */
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { api } from "./api";
 import { useAuth } from "./AuthContext";
+import { useLocale } from "./locale";
 import type { UserRole } from "./types";
 import { useTheme } from "./theme";
 import { Button } from "./ui";
@@ -19,6 +21,7 @@ export default function AppShell({
 }) {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
+  const { locale, toggleLocale, t } = useLocale();
   const nav = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadN, setUnreadN] = useState(0);
@@ -32,30 +35,33 @@ export default function AppShell({
   }, [user]);
 
   type Tab = { to: string; label: string; badge?: number };
-  const tabs: Tab[] =
-    role === "ta"
-      ? [
-          { to: "/ta", label: "总览" },
-          { to: "/ta/notifications", label: "通知", badge: unreadN },
-          { to: "/ta/profile", label: "个人资料" },
-          { to: "/ta/jobs", label: "浏览岗位" },
-          { to: "/ta/applications", label: "我的申请" },
-        ]
-      : role === "mo"
-        ? [
-            { to: "/mo", label: "总览" },
-            { to: "/mo/notifications", label: "通知", badge: unreadN },
-            { to: "/mo/jobs", label: "我的岗位" },
-            { to: "/mo/post", label: "发布岗位" },
-            { to: "/mo/account", label: "账号与安全" },
-          ]
-        : [
-            { to: "/admin", label: "总览" },
-            { to: "/admin/notifications", label: "通知", badge: unreadN },
-            { to: "/admin/users", label: "创建用户" },
-            { to: "/admin/settings", label: "系统设置" },
-            { to: "/admin/logs", label: "活动日志" },
-          ];
+  const tabs: Tab[] = useMemo(() => {
+    if (role === "ta") {
+      return [
+        { to: "/ta", label: t("shell.navOverview") },
+        { to: "/ta/notifications", label: t("shell.navNotifications"), badge: unreadN },
+        { to: "/ta/profile", label: t("shell.navProfile") },
+        { to: "/ta/jobs", label: t("shell.navBrowseJobs") },
+        { to: "/ta/applications", label: t("shell.navMyApplications") },
+      ];
+    }
+    if (role === "mo") {
+      return [
+        { to: "/mo", label: t("shell.navOverview") },
+        { to: "/mo/notifications", label: t("shell.navNotifications"), badge: unreadN },
+        { to: "/mo/jobs", label: t("shell.navMyJobs") },
+        { to: "/mo/post", label: t("shell.navPostJob") },
+        { to: "/mo/account", label: t("shell.navAccount") },
+      ];
+    }
+    return [
+      { to: "/admin", label: t("shell.navOverview") },
+      { to: "/admin/notifications", label: t("shell.navNotifications"), badge: unreadN },
+      { to: "/admin/users", label: t("shell.navUsers") },
+      { to: "/admin/settings", label: t("shell.navSettings") },
+      { to: "/admin/logs", label: t("shell.navLogs") },
+    ];
+  }, [role, unreadN, t]);
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `block px-3 py-2.5 rounded-lg text-sm font-medium md:py-1.5 ${
@@ -74,7 +80,7 @@ export default function AppShell({
               className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 -ml-2"
               aria-expanded={menuOpen}
               aria-controls="mobile-drawer"
-              aria-label={menuOpen ? "关闭菜单" : "打开菜单"}
+              aria-label={menuOpen ? t("shell.closeMenu") : t("shell.openMenu")}
               onClick={() => setMenuOpen((o) => !o)}
             >
               <svg className="w-6 h-6 text-ink-900 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
@@ -90,25 +96,25 @@ export default function AppShell({
                 to="/"
                 className="font-display text-lg font-bold text-ink-950 dark:text-white truncate block"
               >
-                TA 招聘
+                {t("shell.brand")}
               </Link>
               <p className="text-xs text-ink-500 dark:text-slate-400 truncate">{title}</p>
             </div>
           </div>
 
-          <nav className="hidden md:flex flex-wrap gap-1 items-center" aria-label="主导航">
-            {tabs.map((t) => (
+          <nav className="hidden md:flex flex-wrap gap-1 items-center" aria-label={t("shell.navMain")}>
+            {tabs.map((tab) => (
               <NavLink
-                key={t.to}
-                to={t.to}
-                end={t.to === "/ta" || t.to === "/mo" || t.to === "/admin"}
+                key={tab.to}
+                to={tab.to}
+                end={tab.to === "/ta" || tab.to === "/mo" || tab.to === "/admin"}
                 className={navClass}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  {t.label}
-                  {t.badge != null && t.badge > 0 ? (
+                  {tab.label}
+                  {tab.badge != null && tab.badge > 0 ? (
                     <span className="min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
-                      {t.badge > 99 ? "99+" : t.badge}
+                      {tab.badge > 99 ? "99+" : tab.badge}
                     </span>
                   ) : null}
                 </span>
@@ -119,12 +125,21 @@ export default function AppShell({
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
+              onClick={toggleLocale}
+              className="p-2 rounded-lg text-sm text-ink-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              title={locale === "zh" ? t("shell.localeToEn") : t("shell.localeToZh")}
+              aria-label={locale === "zh" ? t("shell.localeToEn") : t("shell.localeToZh")}
+            >
+              {locale === "zh" ? t("shell.localeBtnEn") : t("shell.localeBtnZh")}
+            </button>
+            <button
+              type="button"
               onClick={toggle}
               className="p-2 rounded-lg text-sm text-ink-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              title={theme === "dark" ? "切换浅色" : "切换深色"}
-              aria-label={theme === "dark" ? "切换浅色模式" : "切换深色模式"}
+              title={theme === "dark" ? t("shell.themeToLight") : t("shell.themeToDark")}
+              aria-label={theme === "dark" ? t("shell.themeAriaLight") : t("shell.themeAriaDark")}
             >
-              {theme === "dark" ? "浅色" : "深色"}
+              {theme === "dark" ? t("shell.themeLight") : t("shell.themeDark")}
             </button>
             <span className="text-sm text-ink-600 dark:text-slate-300 hidden lg:inline max-w-[200px] truncate">
               {user?.display_name}
@@ -137,7 +152,7 @@ export default function AppShell({
                 nav("/login");
               }}
             >
-              退出
+              {t("shell.logout")}
             </Button>
           </div>
         </div>
@@ -148,27 +163,27 @@ export default function AppShell({
           <button
             type="button"
             className="md:hidden fixed inset-0 z-[60] bg-black/40 dark:bg-black/60"
-            aria-label="关闭菜单"
+            aria-label={t("shell.closeMenu")}
             onClick={() => setMenuOpen(false)}
           />
           <nav
             id="mobile-drawer"
             className="md:hidden fixed left-0 top-0 bottom-0 z-[70] w-[min(280px,88vw)] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 shadow-xl pt-16 px-3 pb-6 flex flex-col gap-1 overflow-y-auto"
-            aria-label="移动端导航"
+            aria-label={t("shell.navMobile")}
           >
-            {tabs.map((t) => (
+            {tabs.map((tab) => (
               <NavLink
-                key={t.to}
-                to={t.to}
-                end={t.to === "/ta" || t.to === "/mo" || t.to === "/admin"}
+                key={tab.to}
+                to={tab.to}
+                end={tab.to === "/ta" || tab.to === "/mo" || tab.to === "/admin"}
                 className={navClass}
                 onClick={() => setMenuOpen(false)}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  {t.label}
-                  {t.badge != null && t.badge > 0 ? (
+                  {tab.label}
+                  {tab.badge != null && tab.badge > 0 ? (
                     <span className="min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
-                      {t.badge > 99 ? "99+" : t.badge}
+                      {tab.badge > 99 ? "99+" : tab.badge}
                     </span>
                   ) : null}
                 </span>
@@ -185,7 +200,7 @@ export default function AppShell({
         {children}
       </main>
       <footer className="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-ink-500 dark:text-slate-500">
-        EBU6304 Group 65 · TA 招聘系统（Servlet + JSON 文件存储）
+        {t("shell.footer")}
       </footer>
     </div>
   );
