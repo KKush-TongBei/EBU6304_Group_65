@@ -1,10 +1,8 @@
 /**
  * 后端 REST 客户端：在 localStorage 读写 JWT（{@code ta_recruit_token}），请求头附带 Bearer；
- * 英文模式下将 API 返回的 {@code detail} 经 {@link translateApiMessage} 翻译后展示。
+ * API 错误保留原始 {@code detail}，展示时由 {@link translateApiMessage}（{@code te()}）按界面语言翻译。
  */
 import { withAppBase } from "./appBase";
-import { getStoredLocale } from "./locales";
-import { translateApiMessage } from "./translateApiMessage";
 import type {
   ActivityLog,
   Application,
@@ -70,7 +68,7 @@ async function request<T>(
       /* ignore */
     }
     handleUnauthorizedRedirect(path, res.status, Boolean(token));
-    throw new Error(translateApiMessage(detail, getStoredLocale()));
+    throw new Error(detail);
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get("content-type");
@@ -319,7 +317,7 @@ export async function downloadWithAuth(url: string, filename: string): Promise<v
       detail = res.statusText || detail;
     }
     handleUnauthorizedRedirect(url, res.status, Boolean(token));
-    throw new Error(translateApiMessage(detail, getStoredLocale()));
+    throw new Error(detail);
   }
   const blob = await res.blob();
   const a = document.createElement("a");
