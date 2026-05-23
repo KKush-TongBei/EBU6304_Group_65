@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * DAO for users.json persisted in local files (no database).
+ * 用户数据访问层：读写 {@code users.json}，分配自增用户 id，读写锁保证并发安全（无数据库）。
  */
 public final class UserDAO {
   private static volatile UserDAO INSTANCE;

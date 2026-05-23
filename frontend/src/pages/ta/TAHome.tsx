@@ -1,14 +1,18 @@
+/** TA 工作台首页：推荐岗位、收藏与申请概览。 */
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";
 import { notificationCategoryLabel, notificationRiskStyle } from "../../notificationLabels";
 import { useFeedback } from "../../feedback";
+import { useLocale } from "../../locale";
+import { localizeNotification } from "../../translateNotification";
 import type { Notification } from "../../types";
 import AppShell from "../../AppShell";
 import { Button, Card } from "../../ui";
 
 export default function TAHome() {
   const { toast } = useFeedback();
+  const { locale, t, te } = useLocale();
   const [notes, setNotes] = useState<Notification[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [since7, setSince7] = useState(false);
@@ -24,10 +28,9 @@ export default function TAHome() {
       .then(setNotes)
       .catch(() => {
         setNotes([]);
-        toast("通知加载失败", "error");
+        toast(t("common.notificationsLoadFailed"), "error");
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- toast 引用省略以避免无意义重渲染
-  }, [unreadOnly, since7]);
+  }, [unreadOnly, since7, toast, t]);
 
   useEffect(() => {
     loadDash();
@@ -42,7 +45,7 @@ export default function TAHome() {
   const markAll = () => {
     api.notifications.markRead().then(() => {
       setNotes((prev) => prev.map((n) => ({ ...n, read: true })));
-      toast("已全部标为已读", "success");
+      toast(t("common.allMarkedRead"), "success");
       loadDash();
     });
   };
@@ -50,7 +53,7 @@ export default function TAHome() {
   const markOne = (id: number) => {
     api.notifications.markRead([id]).then(() => {
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-      toast("已标为已读", "success");
+      toast(t("common.markedRead"), "success");
       loadDash();
     });
   };
@@ -60,10 +63,12 @@ export default function TAHome() {
       .delete(id)
       .then(() => {
         setNotes((prev) => prev.filter((n) => n.id !== id));
-        toast("已删除", "success");
+        toast(t("common.deleted"), "success");
         loadDash();
       })
-      .catch((e: unknown) => toast(e instanceof Error ? e.message : "删除失败", "error"));
+      .catch((e: unknown) =>
+        toast(e instanceof Error ? te(e.message) : t("common.deleteFailed"), "error")
+      );
   };
 
   const notifLink = (n: Notification) => {
@@ -80,48 +85,51 @@ export default function TAHome() {
   };
 
   return (
-    <AppShell title="助教工作台" role="ta">
+    <AppShell title={t("shell.titleTa")} role="ta">
       {dash ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <Card className="p-4">
-            <p className="text-xs text-ink-500 dark:text-slate-400">我的申请</p>
+            <p className="text-xs text-ink-500 dark:text-slate-400">{t("ta.myApplications")}</p>
             <p className="text-2xl font-bold text-ink-950 dark:text-white mt-1">
-              {String(dash.applications_total ?? "—")}
+              {String(dash.applications_total ?? t("common.dash"))}
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-ink-500 dark:text-slate-400">待处理</p>
+            <p className="text-xs text-ink-500 dark:text-slate-400">{t("ta.applicationsPending")}</p>
             <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 mt-1">
-              {String(dash.applications_pending ?? "—")}
+              {String(dash.applications_pending ?? t("common.dash"))}
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-ink-500 dark:text-slate-400">已录用</p>
+            <p className="text-xs text-ink-500 dark:text-slate-400">{t("ta.applicationsAccepted")}</p>
             <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">
-              {String(dash.applications_accepted ?? "—")}
+              {String(dash.applications_accepted ?? t("common.dash"))}
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-ink-500 dark:text-slate-400">资料完整度</p>
-            <p className="text-2xl font-bold text-accent mt-1">{String(dash.profile_completeness ?? "—")}%</p>
+            <p className="text-xs text-ink-500 dark:text-slate-400">{t("ta.profileCompleteness")}</p>
+            <p className="text-2xl font-bold text-accent mt-1">
+              {String(dash.profile_completeness ?? t("common.dash"))}%
+            </p>
           </Card>
         </div>
       ) : null}
 
       {dash && dash.insights && typeof dash.insights === "object" ? (
         <Card className="p-4 mb-6 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/80">
-          <h2 className="text-sm font-semibold text-ink-800 dark:text-slate-200 mb-2">系统提示（规则引擎）</h2>
+          <h2 className="text-sm font-semibold text-ink-800 dark:text-slate-200 mb-2">{t("ta.insightsTitle")}</h2>
           <ul className="text-sm text-ink-600 dark:text-slate-300 space-y-1 list-disc list-inside">
             <li>
-              七日内截止的可申请岗位约{" "}
-              <strong>{String((dash.insights as Record<string, unknown>).deadline_soon_count ?? "—")}</strong> 个
+              {t("ta.deadlineSoonJobs", {
+                count: String((dash.insights as Record<string, unknown>).deadline_soon_count ?? t("common.dash")),
+              })}
             </li>
             <li>
-              资料待补字段：{" "}
+              {t("ta.missingFields")}{" "}
               {Array.isArray((dash.insights as Record<string, unknown>).missing_profile_fields) &&
               ((dash.insights as Record<string, string[]>).missing_profile_fields?.length ?? 0) > 0
                 ? (dash.insights as Record<string, string[]>).missing_profile_fields.join("、")
-                : "无"}
+                : t("common.none")}
             </li>
           </ul>
         </Card>
@@ -134,73 +142,76 @@ export default function TAHome() {
         >
           <div className="min-w-0">
             <p className="font-semibold text-amber-950 dark:text-amber-100">
-              您有 {unread.length} 条未读通知
+              {t("ta.unreadBanner", { count: unread.length })}
             </p>
-            <p className="text-sm text-amber-900 dark:text-amber-200/90 mt-1">{unread[0]?.body}</p>
+            <p className="text-sm text-amber-900 dark:text-amber-200/90 mt-1">
+              {unread[0] ? localizeNotification(unread[0], locale).body : ""}
+            </p>
             {unread[0] && notifLink(unread[0]) ? (
               <Link
                 to={notifLink(unread[0])!}
                 className="text-sm font-semibold text-accent mt-2 inline-block hover:underline"
               >
-                点击查看 / 前往相关页面 →
+                {t("common.viewRelated")}
               </Link>
             ) : null}
           </div>
           <Button variant="secondary" onClick={markAll}>
-            全部标为已读
+            {t("common.markAllRead")}
           </Button>
         </div>
       )}
 
       <div className="flex flex-wrap gap-2 mb-6">
         <Button variant={!unreadOnly ? "primary" : "secondary"} onClick={() => setUnreadOnly(false)}>
-          全部通知
+          {t("common.allNotifications")}
         </Button>
         <Button variant={unreadOnly ? "primary" : "secondary"} onClick={() => setUnreadOnly(true)}>
-          仅未读
+          {t("common.unreadOnly")}
         </Button>
         <Button variant={since7 ? "primary" : "secondary"} onClick={() => setSince7((v) => !v)}>
-          {since7 ? "最近 7 天（开）" : "最近 7 天"}
+          {since7 ? t("common.last7DaysOn") : t("common.last7Days")}
         </Button>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card className="p-6">
-          <h2 className="font-display font-semibold text-lg text-ink-950 dark:text-white">快速入口</h2>
+          <h2 className="font-display font-semibold text-lg text-ink-950 dark:text-white">{t("ta.quickLinks")}</h2>
           <ul className="mt-4 space-y-2 text-sm">
             <li>
               <Link className="text-accent font-medium hover:underline" to="/ta/profile">
-                编辑个人资料与简历
+                {t("ta.editProfile")}
               </Link>
             </li>
             <li>
               <Link className="text-accent font-medium hover:underline" to="/ta/jobs">
-                浏览开放岗位并申请
+                {t("ta.browseJobs")}
               </Link>
             </li>
             <li>
               <Link className="text-accent font-medium hover:underline" to="/ta/applications">
-                查看申请状态与撤回待处理申请
+                {t("ta.viewApplications")}
               </Link>
             </li>
             <li>
               <Link className="text-accent font-medium hover:underline" to="/ta/notifications">
-                通知中心（筛选、全部标已读）
+                {t("ta.notificationCenter")}
               </Link>
             </li>
           </ul>
         </Card>
         <Card className="p-6">
-          <h2 className="font-display font-semibold text-lg text-ink-950 dark:text-white">最近通知</h2>
+          <h2 className="font-display font-semibold text-lg text-ink-950 dark:text-white">{t("ta.recentNotifications")}</h2>
           {notes.length === 0 ? (
             <p className="text-sm text-ink-500 dark:text-slate-400 mt-4">
-              {unreadOnly ? "暂无未读通知" : "暂无通知"}
+              {unreadOnly ? t("common.noUnreadNotifications") : t("common.noNotifications")}
             </p>
           ) : (
             <ul className="mt-4 space-y-3">
               {notes.slice(0, 8).map((n) => {
                 const href = notifLink(n);
                 const risk = notificationRiskStyle(n.category);
+                const text = localizeNotification(n, locale);
                 return (
                   <li
                     key={n.id}
@@ -217,54 +228,54 @@ export default function TAHome() {
                           <div className="mb-1">
                             {n.read ? (
                               <span className="inline-block rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">
-                                已读
+                                {t("common.readBadge")}
                               </span>
                             ) : (
                               <span className="inline-block rounded-md bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-amber-950 dark:bg-amber-500 dark:text-amber-950">
-                                未读
+                                {t("common.unreadBadge")}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
+                            <span className="font-medium text-ink-900 dark:text-slate-100">{text.title}</span>
                             {n.category ? (
                               <span className="text-xs text-ink-500 dark:text-slate-400">
-                                [{notificationCategoryLabel(n.category)}]
+                                [{notificationCategoryLabel(n.category, locale)}]
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
-                          <span className="text-accent text-xs mt-1 inline-block">点击进入浏览岗位 / 相关页面 →</span>
+                          <p className="text-ink-600 dark:text-slate-300 mt-1">{text.body}</p>
+                          <span className="text-accent text-xs mt-1 inline-block">{t("common.clickToJobs")}</span>
                         </Link>
                       ) : (
                         <>
                           <div className="mb-1">
                             {n.read ? (
                               <span className="inline-block rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">
-                                已读
+                                {t("common.readBadge")}
                               </span>
                             ) : (
                               <span className="inline-block rounded-md bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-amber-950 dark:bg-amber-500 dark:text-amber-950">
-                                未读
+                                {t("common.unreadBadge")}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-ink-900 dark:text-slate-100">{n.title}</span>
+                            <span className="font-medium text-ink-900 dark:text-slate-100">{text.title}</span>
                             {n.category ? (
                               <span className="text-xs text-ink-500 dark:text-slate-400">
-                                [{notificationCategoryLabel(n.category)}]
+                                [{notificationCategoryLabel(n.category, locale)}]
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-ink-600 dark:text-slate-300 mt-1">{n.body}</p>
+                          <p className="text-ink-600 dark:text-slate-300 mt-1">{text.body}</p>
                         </>
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       {!n.read && (
                         <Button variant="ghost" className="!py-1 !px-2 text-xs" onClick={() => markOne(n.id)}>
-                          标已读
+                          {t("common.markRead")}
                         </Button>
                       )}
                       {n.read && (
@@ -273,7 +284,7 @@ export default function TAHome() {
                           className="!py-1 !px-2 text-xs text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                           onClick={() => deleteOne(n.id)}
                         >
-                          删除
+                          {t("common.delete")}
                         </Button>
                       )}
                     </div>

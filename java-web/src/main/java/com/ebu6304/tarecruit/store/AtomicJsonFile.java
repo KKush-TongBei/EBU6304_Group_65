@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
+/** 原子写入 JSON 文件：先写临时文件再替换，降低进程崩溃时文件损坏风险。 */
 public final class AtomicJsonFile {
   private static final ObjectMapper M = AppJson.mapper();
 

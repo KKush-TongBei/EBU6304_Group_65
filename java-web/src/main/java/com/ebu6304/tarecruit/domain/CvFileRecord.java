@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.Instant;
 
+/** 已上传简历文件元数据（路径、原名、上传者等）。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class CvFileRecord {
   public int id;

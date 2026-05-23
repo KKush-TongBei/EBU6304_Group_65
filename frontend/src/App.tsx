@@ -1,7 +1,9 @@
+/** 应用根组件：路由表、认证/主题/语言 Provider，按角色划分 TA/MO/Admin 页面。 */
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { routerBasename } from "./appBase";
 import { AuthProvider } from "./AuthContext";
 import { FeedbackProvider } from "./feedback";
+import { LocaleProvider } from "./locale";
 import { ThemeProvider } from "./theme";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
@@ -24,9 +26,10 @@ import TAProfile from "./pages/ta/TAProfile";
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <FeedbackProvider>
-        <AuthProvider>
+    <LocaleProvider>
+      <ThemeProvider>
+        <FeedbackProvider>
+          <AuthProvider>
           <BrowserRouter basename={routerBasename()}>
             <Routes>
               <Route path="/" element={<HomePage />} />
@@ -167,8 +170,9 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
-        </AuthProvider>
-      </FeedbackProvider>
-    </ThemeProvider>
+          </AuthProvider>
+        </FeedbackProvider>
+      </ThemeProvider>
+    </LocaleProvider>
   );
 }
