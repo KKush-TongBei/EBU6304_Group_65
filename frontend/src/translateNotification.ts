@@ -1,3 +1,4 @@
+/** 将后端通知的固定中文 title/body 模板在英文模式下映射为 locales 中的键文案。 */
 import type { Locale } from "./locales";
 import { translate } from "./locales";
 

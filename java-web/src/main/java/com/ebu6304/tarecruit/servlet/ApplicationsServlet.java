@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** 申请记录查询与状态相关 API。 */
 @WebServlet("/api/applications/*")
 public final class ApplicationsServlet extends JsonServlet {
   private static final Pattern WITHDRAW = Pattern.compile("^/(\\d+)/withdraw$");

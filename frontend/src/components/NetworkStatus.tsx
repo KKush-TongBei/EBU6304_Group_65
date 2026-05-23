@@ -1,3 +1,4 @@
+/** 离线/恢复联网时的顶部横幅提示。 */
 import { useEffect, useState } from "react";
 import { useLocale } from "../locale";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";

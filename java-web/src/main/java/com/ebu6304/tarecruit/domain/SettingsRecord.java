@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/** 系统设置快照：对应 {@code settings.json}。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class SettingsRecord {
   public double max_ta_hours_default = 20.0;

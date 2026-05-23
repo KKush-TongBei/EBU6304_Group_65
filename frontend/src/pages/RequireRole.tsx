@@ -1,3 +1,4 @@
+/** 路由守卫：未登录跳转登录页，角色不匹配则重定向到对应首页。 */
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useLocale } from "../locale";

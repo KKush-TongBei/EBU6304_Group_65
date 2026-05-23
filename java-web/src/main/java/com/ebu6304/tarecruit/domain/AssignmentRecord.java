@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.Instant;
 
+/** 录用/指派记录：对应 {@code assignments.json} 中单条记录。 */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class AssignmentRecord {
   public int id;

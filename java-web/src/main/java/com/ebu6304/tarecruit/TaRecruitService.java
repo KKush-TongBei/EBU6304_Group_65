@@ -42,6 +42,10 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
+/**
+ * 应用核心服务：岗位/申请/通知/活动日志等业务，JSON 文件持久化，读写锁保护并发。
+ * 集成登录锁定、JWT、{@link InputValidation}、弱密码检测、管理员用户治理、MO 招聘流程与 TA 自动评分等。
+ */
 public final class TaRecruitService {
   public static final String CTX_ATTR = TaRecruitService.class.getName();
 
@@ -65,9 +69,9 @@ public final class TaRecruitService {
   private final ReentrantReadWriteLock rw = new ReentrantReadWriteLock();
 
   private static final Set<String> RECRUITING = Set.of("open", "screening", "interview", "shortlist");
-  /** Consecutive wrong passwords before lockout. */
+  /** 连续登录失败次数达到该值后触发账号临时锁定。 */
   private static final int LOGIN_FAILS_BEFORE_LOCK = 3;
-  /** First lock duration (minutes); doubles each subsequent lock until {@link #LOCKOUT_MAX_MINUTES}. */
+  /** 首次锁定时长（分钟）；再次触发时翻倍，上限见 {@link #LOCKOUT_MAX_MINUTES}。 */
   private static final int LOCKOUT_BASE_MINUTES = 5;
   private static final int LOCKOUT_MAX_MINUTES = 24 * 60;
 
@@ -2469,6 +2473,7 @@ public final class TaRecruitService {
     return new ApiException(400, msg);
   }
 
+  /** 弱密码检测：至少 8 位，且同时包含字母与数字；不满足则 422。 */
   private static void validatePasswordStrength(String password) {
     if (password.length() < 8) {
       throw new ApiException(422, "password: at least 8 characters");

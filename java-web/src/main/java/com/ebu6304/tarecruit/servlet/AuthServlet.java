@@ -14,6 +14,7 @@ import java.util.Map;
     "/api/auth/logout",
     "/api/auth/me",
     "/api/auth/delete-account"})
+/** 认证相关 API：注册、登录、当前用户、改密、注销账号等。 */
 public final class AuthServlet extends JsonServlet {
   @Override
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {

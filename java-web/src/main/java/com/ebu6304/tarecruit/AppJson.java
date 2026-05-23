@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+/** 全局 Jackson {@link ObjectMapper} 配置：日期时间、未知字段策略等。 */
 public final class AppJson {
   private static final ObjectMapper MAPPER = new ObjectMapper()
       .registerModule(new JavaTimeModule())

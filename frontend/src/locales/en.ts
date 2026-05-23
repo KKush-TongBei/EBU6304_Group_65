@@ -1,6 +1,6 @@
 import type { Messages } from "./zh";
 
-/** English UI copy */
+/** 英文界面文案（与 {@link ./zh} 键结构一致）。 */
 export const en: Messages = {
   common: {
     loading: "Loading…",

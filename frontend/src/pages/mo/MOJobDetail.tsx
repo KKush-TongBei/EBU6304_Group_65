@@ -1,3 +1,4 @@
+/** MO 岗位详情：申请列表、评分、录用/拒绝、下载简历。 */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, downloadWithAuth } from "../../api";

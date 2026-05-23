@@ -1,3 +1,4 @@
+/** TA 我的申请：查看各岗位申请状态。 */
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import { useFeedback } from "../../feedback";

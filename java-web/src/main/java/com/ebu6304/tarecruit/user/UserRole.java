@@ -2,6 +2,7 @@ package com.ebu6304.tarecruit.user;
 
 import java.util.Locale;
 
+/** 系统角色：助教（TA）、课程负责人（MO）、管理员（admin）。 */
 public enum UserRole {
   TA("ta"),
   MO("mo"),
