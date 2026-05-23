@@ -1,3 +1,4 @@
+/** 界面语言 Context：中文/英文切换，提供 {@code t()} 文案与 {@code te()} API 错误翻译。 */
 import {
   createContext,
   useCallback,

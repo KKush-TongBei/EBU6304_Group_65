@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** 助教（TA）端 API：个人资料、可用时间、收藏、投递、简历上传等。 */
 @WebServlet("/api/ta/*")
 @MultipartConfig(maxFileSize = 5_242_880L, maxRequestSize = 5_500_000L)
 public final class TaServlet extends JsonServlet {

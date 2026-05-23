@@ -1,3 +1,4 @@
+/** MO 工作台首页：所管岗位与待处理申请摘要。 */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";

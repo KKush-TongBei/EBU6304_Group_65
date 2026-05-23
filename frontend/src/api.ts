@@ -1,3 +1,7 @@
+/**
+ * 后端 REST 客户端：在 localStorage 读写 JWT（{@code ta_recruit_token}），请求头附带 Bearer；
+ * 英文模式下将 API 返回的 {@code detail} 经 {@link translateApiMessage} 翻译后展示。
+ */
 import { withAppBase } from "./appBase";
 import { getStoredLocale } from "./locales";
 import { translateApiMessage } from "./translateApiMessage";

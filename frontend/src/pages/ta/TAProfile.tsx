@@ -1,3 +1,4 @@
+/** TA 个人资料：可用时间、技能、简历上传与改密、注销账号。 */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, downloadWithAuth, setToken } from "../../api";

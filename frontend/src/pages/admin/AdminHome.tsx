@@ -1,3 +1,4 @@
+/** 管理员仪表盘：统计概览、风险告警（英文模式下翻译告警文案）。 */
 import { useEffect, useState } from "react";
 import { api, downloadWithAuth } from "../../api";
 import { useFeedback } from "../../feedback";

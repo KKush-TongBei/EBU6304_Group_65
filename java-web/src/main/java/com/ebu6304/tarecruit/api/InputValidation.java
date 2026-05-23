@@ -2,7 +2,11 @@ package com.ebu6304.tarecruit.api;
 
 import java.util.regex.Pattern;
 
-/** Centralized input checks for write paths; failures use HTTP 422 via {@link ApiException}. */
+/**
+ * 写入接口的集中输入校验：邮箱格式与长度、各文本字段上限、非负数值等。
+ * 校验失败抛出 {@link ApiException}（HTTP 422）。密码强度由 {@link com.ebu6304.tarecruit.TaRecruitService} 与
+ * {@link com.ebu6304.tarecruit.user.UserService} 另行处理。
+ */
 public final class InputValidation {
 
   /** Local + @ + domain overall length cap (characters), for UX-friendly validation errors. */

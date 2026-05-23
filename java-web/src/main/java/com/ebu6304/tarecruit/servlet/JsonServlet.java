@@ -12,6 +12,9 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * JSON API Servlet 基类：统一序列化响应、将 {@link com.ebu6304.tarecruit.api.ApiException} 映射为 HTTP 状态与 JSON body。
+ */
 public abstract class JsonServlet extends HttpServlet {
   protected static final ObjectMapper M = AppJson.mapper();
   public static final String ATTR_USER_ID = "taUserId";

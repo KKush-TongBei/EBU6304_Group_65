@@ -1,3 +1,4 @@
+/** MO 发布/编辑岗位：表单校验与模板选择。 */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api";

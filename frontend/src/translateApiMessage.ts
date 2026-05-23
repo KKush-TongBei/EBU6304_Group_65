@@ -1,7 +1,9 @@
 import type { Locale } from "./locales";
 import { translate } from "./locales";
 
-/** Map common backend Chinese API `detail` strings to English when locale is en. */
+/**
+ * 将后端 API 的 {@code detail} 文案在英文模式下映射为英文（含中文错误与校验提示）。
+ */
 const ZH_TO_EN: Record<string, string> = {
   "Invalid email or password": "Invalid email or password",
   "账号已禁用": "Account is disabled",

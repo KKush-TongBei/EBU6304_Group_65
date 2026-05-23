@@ -1,3 +1,4 @@
+/** 登录页：校验邮箱格式，成功后由 AuthContext 保存 JWT 并按角色跳转。 */
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../AuthContext";

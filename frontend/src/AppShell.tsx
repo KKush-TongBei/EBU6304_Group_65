@@ -1,3 +1,4 @@
+/** 已登录用户的布局壳：顶栏导航、未读通知、深浅色与语言切换、退出登录。 */
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { api } from "./api";

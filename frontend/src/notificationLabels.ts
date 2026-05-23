@@ -1,7 +1,7 @@
 import type { Locale } from "./locales";
 import { translate } from "./locales";
 
-/** Human-readable labels for in-app notification categories (API stores English slugs). */
+/** 通知分类 slug 的展示文案（API 存英文 category，界面按 locale 翻译）。 */
 export function notificationCategoryLabel(category: string | undefined, locale: Locale): string {
   if (!category) {
     return translate(locale, "notifications.categorySystem");

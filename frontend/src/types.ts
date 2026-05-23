@@ -1,3 +1,4 @@
+/** 与后端 JSON 字段对齐的 TypeScript 类型定义（用户、岗位、申请、通知等）。 */
 export type UserRole = "ta" | "mo" | "admin";
 
 export interface AdminUserSummary {
